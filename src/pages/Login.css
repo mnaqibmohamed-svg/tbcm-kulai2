@@ -1,0 +1,211 @@
+/* Login.css */
+
+/* Pengesetan Asas */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: 'Poppins', 'Segoe UI', Roboto, sans-serif; /* Gunakan fonsans-serif moden yang bersih */
+}
+
+/* Bekas Skrin Utama */
+.login-screen-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  /* Kecerunan latar belakang halus yang diilhamkan oleh logo (merah/biru pudar) */
+  background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(240,240,240,1) 100%);
+  padding: 20px;
+}
+
+/* Kad Log Masuk Terapung */
+.login-card {
+  background: #fff;
+  padding: 40px 50px;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+  /* Bayang-bayang berasingan untuk kesan terapung */
+  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+}
+
+.login-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+}
+
+/* Panel Logo */
+.login-logo-panel {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.pkd-logo {
+  max-width: 160px; /* Saiz logo yang menonjol */
+  height: auto;
+  filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1)); /* Bayang-bayang logo halus */
+}
+
+/* Panel Borang */
+.login-form-panel {
+  width: 100%;
+}
+
+/* Pengepala Log Masuk */
+.login-header {
+  text-align: center;
+  margin-bottom: 35px;
+}
+
+.system-title {
+  color: #333;
+  font-weight: 700;
+  font-size: 1.8rem;
+  letter-spacing: 1.5px;
+}
+
+.system-subtitle {
+  color: #666;
+  font-size: 0.9rem;
+  margin-top: -5px;
+  margin-bottom: 25px;
+}
+
+.login-title {
+  color: #000080; /* Warna biru pudar PKD untuk tajuk log masuk */
+  font-weight: 600;
+  font-size: 1.4rem;
+  border-bottom: 2px solid #FF0000; /* Garisan aksen merah PKD di bawah tajuk */
+  padding-bottom: 5px;
+  display: inline-block;
+}
+
+/* Gaya Kumpulan Borang dan Input */
+.login-form .form-group {
+  text-align: left;
+  margin-bottom: 22px;
+}
+
+.login-form label {
+  font-weight: 500;
+  color: #555;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.login-form .input-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.login-form .input-icon {
+  position: absolute;
+  left: 15px;
+  color: #888;
+  font-size: 1.2rem;
+}
+
+.login-form input[type="email"],
+.login-form input[type="password"] {
+  width: 100%;
+  padding: 12px 15px 12px 45px; /* Tambah padding kiri untuk ikon */
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 1rem;
+  color: #333;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.login-form input[type="email"]:focus,
+.login-form input[type="password"]:focus {
+  border-color: #000080; /* Warna biru PKD untuk input yang difokuskan */
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0,0,128,0.1); /* Kesan 'ring' biru lembut pada fokus */
+}
+
+/* Baris Tindakan Borang */
+.form-actions-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+  font-size: 0.9rem;
+}
+
+.remember-me-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.remember-me-group input[type="checkbox"] {
+  margin-top: -2px;
+}
+
+.remember-me-group label {
+  color: #666;
+  font-weight: 400;
+  cursor: pointer;
+  margin: 0; /* Tetapkan margin kepada sifar untuk label ini */
+}
+
+.forgot-password {
+  color: #000080; /* Biru PKD untuk pautan penting */
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.forgot-password:hover {
+  color: #FF0000; /* Merah PKD pada 'hover' */
+  text-decoration: underline;
+}
+
+/* Gaya Butang */
+.login-button {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 1px;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.btn-red {
+  background-color: #FF0000; /* Warna merah utama PKD untuk butang utama */
+  color: #fff;
+}
+
+.login-button:hover {
+  background-color: #CC0000; /* Merah PKD yang lebih gelap pada 'hover' */
+}
+
+.login-button:active {
+  transform: translateY(1px); /* Kesan tekan butang halus */
+}
+
+/* Kaki Skrin Log Masuk */
+.login-footer {
+  margin-top: 35px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: #888;
+}
+
+.community-slogan {
+  margin-top: 5px;
+  font-size: 0.85rem;
+  color: #666;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
