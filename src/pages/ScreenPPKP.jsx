@@ -25,8 +25,9 @@ export default function ScreenPPKP() {
 
   const [showModal, setShowModal] = useState(false);
   const [selectedCase, setSelectedCase] = useState(null); 
+  // Tambah default pegawai_notis
   const [contactForm, setContactForm] = useState({
-    nama: '', ic_no: '', no_tel: '', alamat: '', tarikh_saringan_1: ''
+    nama: '', ic_no: '', no_tel: '', alamat: '', tarikh_saringan_1: '', pegawai_notis: 'Maziah'
   });
   const [loadingContact, setLoadingContact] = useState(false);
   
@@ -99,9 +100,6 @@ export default function ScreenPPKP() {
     }
   };
 
-  // ==========================================
-  // FUNGSI BANTUAN UNTUK GAMBAR PDF
-  // ==========================================
   const getBase64ImageFromUrl = async (imageUrl) => {
     const res = await fetch(imageUrl);
     const blob = await res.blob();
@@ -114,95 +112,115 @@ export default function ScreenPPKP() {
   };
 
   // ==========================================
-  // FUNGSI JANA PDF NOTIS SARINGAN TIBI TERKINI
+  // FUNGSI JANA PDF (DIKEMASKINI: TEXT JUSTIFY & VARIANT)
   // ==========================================
-  const generateNotisPDF = async (kontak, klinik) => {
+  const generateNotisPDF = async (kontak, kes, pegawai) => {
     const doc = new jsPDF();
     const margin = 20;
-    let y = 15; // Mula lebih atas untuk ruang logo
+    let y = 15; 
 
+    // Muat Turun Logo Jata & KKM
     try {
-      // Dapatkan gambar dari folder public
       const jataBase64 = await getBase64ImageFromUrl('/jata.jpg');
       const kkmBase64 = await getBase64ImageFromUrl('/kkm.jpg');
-      
-      // Masukkan logo bersebelahan di tengah-tengah (Center of A4 is 105)
-      // Jata diletak di paksi X:70, KKM di paksi X:110. Saiz diselaraskan.
       doc.addImage(jataBase64, 'JPEG', 72, y, 28, 22);
       doc.addImage(kkmBase64, 'JPEG', 110, y, 22, 22);
-      
-      y += 35; // Jarakkan tulisan dari logo
+      y += 35; 
     } catch (err) {
       console.error("Gagal memuat turun logo untuk PDF", err);
-      // Jika logo gagal dimuatkan (contoh: belum letak dlm folder), teks tetap akan dijana
       y += 15; 
     }
 
-    // Header Tajuk
+    // Tajuk Tengah
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
     doc.text("NOTIS MENJALANI PEMERIKSAAN PENGESAHAN PENYAKIT TIBI", 105, y, { align: "center" });
 
-    y += 20;
+    y += 18;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(12);
 
-    // Perenggan 1
-    const p1 = `Adalah dimaklumkan bahawa penyiasatan pihak kami mendapati tuan/puan bernama ${kontak.nama} mempunyai kaitan rapat dengan pesakit Tibi yang boleh menyebabkan tuan/puan atau individu/mereka yang di bawah jagaan tuan/puan turut mendapat jangkitan Tibi.`;
-    const p1Lines = doc.splitTextToSize(p1, 170);
-    doc.text(p1Lines, margin, y);
-    y += (p1Lines.length * 7) + 5;
+    // Format Tarikh ke DD/MM/YYYY
+    const formatTarikhDiberi = (tarikhStr) => {
+      if (!tarikhStr) return '...................';
+      const d = new Date(tarikhStr);
+      return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+    };
 
-    // Perenggan 2
-    const p2 = `2. Oleh yang demikian, tuan/puan dan/atau individu/mereka yang di bawah jagaan tuan/puan diarah untuk menghadirkan diri ke ${klinik} pada waktu pejabat dalam tempoh 2 minggu dari tarikh surat ini bagi menjalani pemeriksaan saringan dan pengesahan penyakit Tibi.`;
-    const p2Lines = doc.splitTextToSize(p2, 170);
-    doc.text(p2Lines, margin, y);
-    y += (p2Lines.length * 7) + 5;
+    // --- Perenggan 1 (Justify, Dynamic Indeks Name) ---
+    const p1 = `Adalah dimaklumkan bahawa penyiasatan pihak kami mendapati Tuan/Puan bernama ${kontak.nama} mempunyai kaitan rapat dengan pesakit Tibi ${kes.nama} yang boleh menyebabkan Tuan/Puan atau individu/mereka yang di bawah jagaan Tuan/Puan turut mendapat jangkitan Tibi.`;
+    doc.text(p1, margin, y, { maxWidth: 170, align: "justify" });
+    y += (doc.splitTextToSize(p1, 170).length * 6) + 5;
 
-    // Perenggan 3
-    const p3 = `3. Kegagalan tuan/puan atau individu/mereka yang dibawah jagaan tuan/puan hadir menjalani pemeriksaan boleh ditafsir sebagai enggan bekerjasama bagi membendung penyebaran penyakit berjangkit. Ini memungkinkan tuan/puan dikenakan tindakan undang-undang di bawah Seksyen 15, Akta Pencegahan dan Pengawalan Penyakit Berjangkit 1988.`;
-    const p3Lines = doc.splitTextToSize(p3, 170);
-    doc.text(p3Lines, margin, y);
-    y += (p3Lines.length * 7) + 10;
+    // --- Perenggan 2 (Justify, Klinik, Tarikh & Masa 8.30) ---
+    const p2 = `2. Oleh yang demikian, Tuan/Puan dan/atau individu/mereka yang di bawah jagaan Tuan/Puan diarah untuk menghadirkan diri ke ${kes.klinik} pada waktu pejabat pada ${formatTarikhDiberi(kontak.tarikh_saringan_1)} pukul 8.30 pagi bagi menjalani pemeriksaan saringan dan pengesahan penyakit Tibi.`;
+    doc.text(p2, margin, y, { maxWidth: 170, align: "justify" });
+    y += (doc.splitTextToSize(p2, 170).length * 6) + 5;
 
-    // Penutup
+    // --- Perenggan 3 (Justify) ---
+    const p3 = `3. Kegagalan Tuan/Puan atau individu/mereka yang dibawah jagaan Tuan/Puan hadir menjalani pemeriksaan boleh ditafsir sebagai enggan bekerjasama bagi membendung penyebaran penyakit berjangkit. Ini memungkinkan Tuan/Puan dikenakan tindakan undang-undang di bawah Seksyen 15, Akta Pencegahan dan Pengawalan Penyakit Berjangkit 1988.`;
+    doc.text(p3, margin, y, { maxWidth: 170, align: "justify" });
+    y += (doc.splitTextToSize(p3, 170).length * 6) + 12;
+
+    // --- Penutup ---
     doc.text("Sekian, terima kasih.", margin, y);
-    y += 15;
+    y += 12;
 
     doc.setFont("helvetica", "bold");
     doc.text("BERKHIDMAT UNTUK NEGARA", margin, y);
-    y += 15;
+    y += 12;
 
-    // Tandatangan & Butiran Pegawai
     doc.setFont("helvetica", "normal");
     doc.text("Saya yang menurut perintah,", margin, y);
-    y += 30; 
+    y += 15; 
 
-    doc.text(".......................................................................", margin, y);
-    y += 7;
-    doc.setFont("helvetica", "bold");
-    doc.text("Penolong Pegawai Kesihatan Persekitaran,", margin, y);
-    y += 7;
-    doc.text("Unit Tibi/Kusta,", margin, y);
-    y += 7;
-    doc.text("Pejabat Kesihatan Daerah Kulai.", margin, y);
+    // --- LOGIK VARIANT PEGAWAI (MAZIAH / FAUZI) ---
+    if (pegawai === 'Maziah') {
+      try {
+        // Guna gambar tandatangan + teks yang user upload
+        const maziahBase64 = await getBase64ImageFromUrl('/tandatangan-maziah.jpg');
+        // Saiz gambar dilaraskan supaya sepadan (Lebar 100, Tinggi 30)
+        doc.addImage(maziahBase64, 'JPEG', margin, y - 5, 100, 30);
+        y += 30;
+      } catch (err) {
+        // Fallback jika gambar gagal diload
+        doc.setFont("helvetica", "bold");
+        doc.text("MAZIAH BINTI MD NOOR", margin, y);
+        y += 6;
+        doc.text("PEN. PEG. KESIHATAN PERSEKITARAN", margin, y);
+        y += 6;
+        doc.text("UNIT TIBI, PEJABAT KESIHATAN KULAI", margin, y);
+        y += 10;
+        doc.setFont("helvetica", "normal");
+      }
+      doc.text("No. Telefon: +60 12-747 8949", margin, y);
+    } 
+    else {
+      // Variant Fauzi (Teks Sepenuhnya)
+      doc.text(".......................................................................", margin, y);
+      y += 7;
+      doc.setFont("helvetica", "bold");
+      doc.text("MOHD FAUZI BIN ZAINI", margin, y);
+      y += 6;
+      doc.text("PEN. PEG. KESIHATAN PERSEKITARAN", margin, y);
+      y += 6;
+      doc.text("UNIT TIBI, PEJABAT KESIHATAN KULAI", margin, y);
+      y += 10;
+      doc.setFont("helvetica", "normal");
+      doc.text("No. Telefon: +60 11-1171 5397", margin, y);
+    }
 
-    y += 10;
-    doc.setFont("helvetica", "normal");
-    doc.text("No. Telefon: +60 12-747 8949", margin, y);
-    y += 7;
-
+    y += 8;
     const today = new Date().toLocaleDateString('ms-MY');
     doc.text(`Tarikh: ${today}`, margin, y);
 
-    // Muat Turun Fail
-    const filename = `Notis_TB_${kontak.nama.replace(/\s+/g, '_')}.pdf`;
-    doc.save(filename);
+    // Simpan fail menggunakan nama kontak
+    doc.save(`${kontak.nama}.pdf`);
   };
   // ==========================================
 
   const openModal = (kes) => { setSelectedCase(kes); setShowModal(true); };
-  const closeModal = () => { setShowModal(false); setSelectedCase(null); setContactForm({ nama: '', ic_no: '', no_tel: '', alamat: '', tarikh_saringan_1: '' }); };
+  const closeModal = () => { setShowModal(false); setSelectedCase(null); setContactForm({ nama: '', ic_no: '', no_tel: '', alamat: '', tarikh_saringan_1: '', pegawai_notis: 'Maziah' }); };
   const handleContactChange = (e) => { setContactForm({ ...contactForm, [e.target.name]: e.target.value }); };
 
   const handleContactSubmit = async (e) => {
@@ -218,8 +236,8 @@ export default function ScreenPPKP() {
       closeModal();
       handleSendSMS(data[0].id, data[0].no_tel, data[0].nama, data[0].tarikh_saringan_1, selectedCase.klinik, 1);
       
-      // Auto-Jana PDF (Tunggu gambar siap diproses)
-      await generateNotisPDF(data[0], selectedCase.klinik);
+      // Auto-Jana PDF mengikut pilihan pegawai yang dipilih dalam borang
+      await generateNotisPDF(data[0], selectedCase, contactForm.pegawai_notis);
     }
     setLoadingContact(false);
   };
@@ -335,7 +353,7 @@ export default function ScreenPPKP() {
     return { color: '#10b981', fontWeight: 'bold' };
   };
 
-  const colors = { dark: '#1e293b', blue: '#007bff', cyan: '#17a2b8', green: '#28a745', yellow: '#ffc107', red: '#dc3545', grey: '#6c757d', purple: '#8b5cf6' };
+  const colors = { dark: '#1e293b', blue: '#007bff', cyan: '#17a2b8', green: '#28a745', yellow: '#ffc107', red: '#dc3545', grey: '#6c757d', purple: '#8b5cf6', pink: '#ec4899' };
   const s = {
     page: { padding: '20px', fontFamily: 'Arial, sans-serif', backgroundColor: '#f4f6f9', minHeight: '100vh' },
     topHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '3px solid #ddd', paddingBottom: '15px', marginBottom: '20px' },
@@ -481,9 +499,15 @@ export default function ScreenPPKP() {
                                       <span style={{ marginLeft: '10px', fontSize: '11px', padding: '3px 8px', borderRadius: '12px', backgroundColor: '#e2e8f0', color: '#475569' }}>Status SMS: {c.sms_status || 'Belum Dihantar'}</span>
                                     </div>
                                     
-                                    <button onClick={() => generateNotisPDF(c, kes.klinik)} style={{ padding: '6px 12px', backgroundColor: colors.purple, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>
-                                      📄 Cetak Notis PDF
-                                    </button>
+                                    {/* BUTANG JANA PDF (2 VARIANT PEGAWAI) */}
+                                    <div style={{ display: 'flex', gap: '5px' }}>
+                                      <button onClick={() => generateNotisPDF(c, kes, 'Maziah')} style={{ padding: '6px 10px', backgroundColor: colors.purple, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold' }}>
+                                        📄 Notis (Maziah)
+                                      </button>
+                                      <button onClick={() => generateNotisPDF(c, kes, 'Fauzi')} style={{ padding: '6px 10px', backgroundColor: colors.pink, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold' }}>
+                                        📄 Notis (Fauzi)
+                                      </button>
+                                    </div>
                                   </div>
                                   
                                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
@@ -547,6 +571,16 @@ export default function ScreenPPKP() {
               <div style={s.formGroup}><label style={{ fontSize: '13px', fontWeight: 'bold' }}>No. Telefon</label><input type="text" name="no_tel" value={contactForm.no_tel} onChange={handleContactChange} required style={s.input}/></div>
               <div style={s.formGroup}><label style={{ fontSize: '13px', fontWeight: 'bold' }}>Alamat Rumah</label><textarea name="alamat" value={contactForm.alamat} onChange={handleContactChange} required style={{...s.input, minHeight: '60px'}}/></div>
               <div style={s.formGroup}><label style={{ fontSize: '13px', fontWeight: 'bold' }}>Tarikh Saringan 1 (Diberi)</label><input type="date" name="tarikh_saringan_1" value={contactForm.tarikh_saringan_1} onChange={handleContactChange} required style={s.input}/></div>
+              
+              {/* DROPDOWN PEMILIHAN PEGAWAI */}
+              <div style={s.formGroup}>
+                <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Surat Notis (Auto-PDF)</label>
+                <select name="pegawai_notis" value={contactForm.pegawai_notis} onChange={handleContactChange} style={s.input}>
+                  <option value="Maziah">Maziah Binti Md Noor (Ada Tandatangan)</option>
+                  <option value="Fauzi">Mohd Fauzi Bin Zaini (Teks Sahaja)</option>
+                </select>
+              </div>
+
               <button type="submit" disabled={loadingContact} style={{ width: '100%', padding: '10px', backgroundColor: colors.blue, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', marginTop: '10px' }}>{loadingContact ? 'Memproses...' : 'Simpan, Hantar SMS & Jana Notis (PDF)'}</button>
             </form>
           </div>
