@@ -629,18 +629,32 @@ export default function ScreenPPKP() {
 
       {showCalendar && (
         <div style={s.modalOverlay}>
-          <div style={s.modalContent}>
-            <button onClick={() => setShowCalendar(false)} style={{ position: 'absolute', top: '10px', right: '15px', border: 'none', background: 'none', fontSize: '24px', cursor: 'pointer' }}>&times;</button>
-            <h3 style={{ marginTop: 0, textAlign: 'center' }}>Jadual Temujanji Mengikut Klinik</h3>
-            <div style={{ display: 'flex', justifyContent: 'center', margin: '15px 0' }}><Calendar onChange={setSelectedDate} value={selectedDate} tileContent={tileContent} /></div>
-            <div style={{ backgroundColor: '#f9f9f9', padding: '15px', borderRadius: '8px', border: '1px solid #ddd' }}>
-              <h4>Temujanji: {selectedDate.toLocaleDateString('ms-MY')}</h4>
+          {/* Tambah maxHeight, display flex dan column supaya ia tak lebih dari skrin */}
+          <div style={{...s.modalContent, maxHeight: '90vh', display: 'flex', flexDirection: 'column', width: '450px'}}>
+            
+            {/* Butang pangkah statik */}
+            <button onClick={() => setShowCalendar(false)} style={{ position: 'absolute', top: '10px', right: '15px', border: 'none', background: 'none', fontSize: '24px', cursor: 'pointer', zIndex: 10 }}>&times;</button>
+            
+            <h3 style={{ marginTop: 0, textAlign: 'center', flexShrink: 0 }}>Jadual Temujanji Mengikut Klinik</h3>
+            
+            {/* Kalendar statik */}
+            <div style={{ display: 'flex', justifyContent: 'center', margin: '15px 0', flexShrink: 0 }}>
+              <Calendar onChange={setSelectedDate} value={selectedDate} tileContent={tileContent} />
+            </div>
+            
+            {/* RUANGAN SENARAI YANG BOLEH DI-SCROLL */}
+            <div style={{ backgroundColor: '#f9f9f9', padding: '15px', borderRadius: '8px', border: '1px solid #ddd', overflowY: 'auto', flexGrow: 1 }}>
+              {/* Tajuk Tarikh Kekal di Atas bila scroll (Sticky) */}
+              <h4 style={{ margin: '0 0 10px 0', position: 'sticky', top: 0, backgroundColor: '#f9f9f9', zIndex: 2, paddingBottom: '5px', borderBottom: '2px solid #ddd' }}>
+                Temujanji: {selectedDate.toLocaleDateString('ms-MY')}
+              </h4>
+              
               {appointmentsOnSelectedDate.length === 0 ? ( <p>Tiada temujanji.</p> ) : (
                 <ul style={{ fontSize: '14px', paddingLeft: '20px', margin: 0 }}>
                   {appointmentsOnSelectedDate.map(kontak => {
                     const ks = indexCases.find(i => i.id === kontak.index_case_id);
                     return (
-                      <li key={kontak.id} style={{ marginBottom: '5px' }}>
+                      <li key={kontak.id} style={{ marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px dashed #ccc' }}>
                         <strong>{kontak.nama}</strong> ({kontak.no_tel})<br/>
                         <span style={{ color: colors.blue, fontWeight: 'bold', fontSize: '12px' }}>Klinik: {ks?.klinik || '-'}</span> <span style={{ color: '#666', fontSize: '12px' }}> | Indeks: {ks?.nama || '-'}</span>
                       </li>
@@ -649,6 +663,7 @@ export default function ScreenPPKP() {
                 </ul>
               )}
             </div>
+
           </div>
         </div>
       )}
