@@ -74,8 +74,8 @@ export default function ScreenPPKP() {
     try {
       await supabase.from('contacts').update({ sms_status: `Sedang Dihantar (S${saringanLvl})...` }).eq('id', kontakId);
       fetchData();
-      const mesej = `NOTIS KKM: Salam sejahtera En/Pn ${namaKontak}. Anda mempunyai temujanji Saringan TB (S${saringanLvl}) di ${klinik} pada ${tarikhSaringan}. Sila hadir mengikut jadual.`;
-      const apiKey = 'TAMPAL_API_KEY_ANDA_DI_SINI'; 
+      const mesej = `PKD Kulai: Salam En/Pn ${namaKontak}. Anda mempunyai temujanji Saringan TB di ${klinik} pada ${tarikhSaringan}. Sila hadir mengikut jadual.`;
+      const apiKey = 'fea7875864e5a9e124b1080109b5dd8b'; 
       let formatTel = noTel.replace(/[^0-9]/g, ''); 
       if (formatTel.startsWith('0')) formatTel = '6' + formatTel; 
       const targetUrl = `https://www.sms123.net/api/send.php?apiKey=${apiKey}&recipients=${formatTel}&messageContent=${encodeURIComponent(mesej)}`;
