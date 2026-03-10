@@ -49,18 +49,16 @@ export default function ScreenAdmin() {
   };
 
   // ==========================================
-  // --- PENAMBAHBAIKAN 1: EXPORT EXCEL TERPERINCI
+  // --- EXPORT EXCEL TERPERINCI
   // ==========================================
   const handleExportExcel = () => {
     const exportData = [];
     
-    // Format Masa Lengkap (Tarikh & Masa Daftar)
     const formatDateTime = (dateString) => {
       if (!dateString) return '-';
       return new Date(dateString).toLocaleString('ms-MY', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
     };
     
-    // Format Tarikh Sahaja
     const formatDateOnly = (dateString) => {
       if (!dateString) return '-';
       return new Date(dateString).toLocaleDateString('ms-MY', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -99,19 +97,15 @@ export default function ScreenAdmin() {
             'No Tel Kontak': kontak.no_tel,
             'Status TB Kontak': kontak.status_tb || 'Dalam Saringan',
             
-            // Saringan 1
             'Tarikh Diberi (S1)': formatDateOnly(kontak.tarikh_saringan_1), 'Tarikh Hadir (S1)': formatDateOnly(kontak.tarikh_hadir_1),
             'IGRA (S1)': kontak.igra_1 || '-', 'Mantoux (S1)': kontak.mantoux_1 || '-', 'CXR (S1)': kontak.cxr_1 || '-',
             
-            // Saringan 2
             'Tarikh Diberi (S2)': formatDateOnly(kontak.tarikh_saringan_2), 'Tarikh Hadir (S2)': formatDateOnly(kontak.tarikh_hadir_2),
             'IGRA (S2)': kontak.igra_2 || '-', 'Mantoux (S2)': kontak.mantoux_2 || '-', 'CXR (S2)': kontak.cxr_2 || '-',
             
-            // Saringan 3
             'Tarikh Diberi (S3)': formatDateOnly(kontak.tarikh_saringan_3), 'Tarikh Hadir (S3)': formatDateOnly(kontak.tarikh_hadir_3),
             'IGRA (S3)': kontak.igra_3 || '-', 'Mantoux (S3)': kontak.mantoux_3 || '-', 'CXR (S3)': kontak.cxr_3 || '-',
             
-            // Saringan 4
             'Tarikh Diberi (S4)': formatDateOnly(kontak.tarikh_saringan_4), 'Tarikh Hadir (S4)': formatDateOnly(kontak.tarikh_hadir_4),
             'IGRA (S4)': kontak.igra_4 || '-', 'Mantoux (S4)': kontak.mantoux_4 || '-', 'CXR (S4)': kontak.cxr_4 || '-'
           });
@@ -147,15 +141,14 @@ export default function ScreenAdmin() {
   const ratioAll = calcRatio(kpiIndeks, kpiKontak);
   const ratioSP = calcRatio(indeksSP, kontakSP);
 
+  // KEMASKINI: calcPercent kini pulangkan { count, percent }
   const calcPercent = (saringanNum) => {
-    if (kpiKontak === 0) return '0%';
-    const attended = filteredContacts.filter(c => c[`tarikh_hadir_${saringanNum}`]).length;
-    return `${((attended / kpiKontak) * 100).toFixed(1)}%`;
+    const attendedCount = filteredContacts.filter(c => c[`tarikh_hadir_${saringanNum}`]).length;
+    const percentage = kpiKontak === 0 ? '0%' : `${((attendedCount / kpiKontak) * 100).toFixed(1)}%`;
+    return { count: attendedCount, percent: percentage };
   };
 
-  // ==========================================
-  // --- PENAMBAHBAIKAN 2: KPI < 14 HARI
-  // ==========================================
+  // KPI < 14 HARI
   const calc14DaysKPI = (n) => {
     const within14DaysCount = filteredContacts.filter(c => {
       const scheduled = c[`tarikh_saringan_${n}`];
@@ -164,7 +157,7 @@ export default function ScreenAdmin() {
       
       const diffTime = new Date(attended) - new Date(scheduled);
       const diffDays = diffTime / (1000 * 60 * 60 * 24);
-      return diffDays <= 14; // Hadir awal atau maksimum lambat 14 hari
+      return diffDays <= 14; 
     }).length;
 
     const percentage = kpiKontak === 0 ? '0%' : `${((within14DaysCount / kpiKontak) * 100).toFixed(1)}%`;
@@ -261,17 +254,17 @@ export default function ScreenAdmin() {
               </div>
             </div>
 
+            {/* KEMASKINI: PAPARAN BILANGAN DAN PERATUS (KPI HIJAU) */}
             <div style={s.kpiCard(colors.green)}>
               <h4 style={s.kpiTitle}>Peratus Hadir Keseluruhan</h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: 'auto' }}>
-                <div style={s.kpiSubText}><span>Saringan 1:</span> <strong>{calcPercent(1)}</strong></div>
-                <div style={s.kpiSubText}><span>Saringan 2:</span> <strong>{calcPercent(2)}</strong></div>
-                <div style={s.kpiSubText}><span>Saringan 3:</span> <strong>{calcPercent(3)}</strong></div>
-                <div style={s.kpiSubText}><span>Saringan 4:</span> <strong>{calcPercent(4)}</strong></div>
+                <div style={s.kpiSubText}><span>Saringan 1:</span> <strong>{calcPercent(1).count} kes ({calcPercent(1).percent})</strong></div>
+                <div style={s.kpiSubText}><span>Saringan 2:</span> <strong>{calcPercent(2).count} kes ({calcPercent(2).percent})</strong></div>
+                <div style={s.kpiSubText}><span>Saringan 3:</span> <strong>{calcPercent(3).count} kes ({calcPercent(3).percent})</strong></div>
+                <div style={s.kpiSubText}><span>Saringan 4:</span> <strong>{calcPercent(4).count} kes ({calcPercent(4).percent})</strong></div>
               </div>
             </div>
 
-            {/* KAD KPI BAHARU: HADIR < 14 HARI */}
             <div style={s.kpiCard(colors.yellow)}>
               <h4 style={s.kpiTitle}>Kepatuhan Hadir (&le; 14 Hari)</h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: 'auto' }}>
