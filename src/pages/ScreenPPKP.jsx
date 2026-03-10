@@ -10,10 +10,10 @@ export default function ScreenPPKP() {
   const navigate = useNavigate();
   
   const [formData, setFormData] = useState({
-    nama: '', ic_no: '', no_tel: '', alamat: '', 
+    no_daftar_tibi: '', nama: '', ic_no: '', no_tel: '', alamat: '', 
     tarikh_notifikasi: '', tarikh_diagnosis: '', klinik: 'KK Kulai', kategori: 'Smear Positif'
   });
-  const [loading, setLoading] = useState(false);
+  const [loading, useStateLoading] = useState(false);
   const [indexCases, setIndexCases] = useState([]);
   const [allContacts, setAllContacts] = useState([]); 
   const [expandedCaseId, setExpandedCaseId] = useState(null); 
@@ -25,7 +25,11 @@ export default function ScreenPPKP() {
 
   const [showModal, setShowModal] = useState(false);
   const [selectedCase, setSelectedCase] = useState(null); 
-  // Tambah default pegawai_notis
+  
+  // State untuk Muat Naik Pukal (Bulk Upload)
+  const [contactUploadMode, setContactUploadMode] = useState('manual'); // 'manual' | 'excel'
+  const [bulkContacts, setBulkContacts] = useState([]);
+  
   const [contactForm, setContactForm] = useState({
     nama: '', ic_no: '', no_tel: '', alamat: '', tarikh_saringan_1: '', pegawai_notis: 'Maziah'
   });
@@ -48,14 +52,16 @@ export default function ScreenPPKP() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    useStateLoading(true);
     const { error } = await supabase.from('index_cases').insert([formData]);
     if (!error) {
       alert('Kes Indeks berjaya didaftarkan!');
-      setFormData({ nama: '', ic_no: '', no_tel: '', alamat: '', tarikh_notifikasi: '', tarikh_diagnosis: '', klinik: 'KK Kulai', kategori: 'Smear Positif' });
+      setFormData({ no_daftar_tibi: '', nama: '', ic_no: '', no_tel: '', alamat: '', tarikh_notifikasi: '', tarikh_diagnosis: '', klinik: 'KK Kulai', kategori: 'Smear Positif' });
       fetchData();
+    } else {
+      alert('Ralat menyimpan indeks: ' + error.message);
     }
-    setLoading(false);
+    useStateLoading(false);
   };
 
   const handleDeleteIndex = async (id, nama) => {
@@ -111,15 +117,11 @@ export default function ScreenPPKP() {
     });
   };
 
-  // ==========================================
-  // FUNGSI JANA PDF (DIKEMASKINI: TEXT JUSTIFY & VARIANT)
-  // ==========================================
   const generateNotisPDF = async (kontak, kes, pegawai) => {
     const doc = new jsPDF();
     const margin = 20;
     let y = 15; 
 
-    // Muat Turun Logo Jata & KKM
     try {
       const jataBase64 = await getBase64ImageFromUrl('/jata.jpg');
       const kkmBase64 = await getBase64ImageFromUrl('/kkm.jpg');
@@ -127,11 +129,9 @@ export default function ScreenPPKP() {
       doc.addImage(kkmBase64, 'JPEG', 110, y, 22, 22);
       y += 35; 
     } catch (err) {
-      console.error("Gagal memuat turun logo untuk PDF", err);
       y += 15; 
     }
 
-    // Tajuk Tengah
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
     doc.text("NOTIS MENJALANI PEMERIKSAAN PENGESAHAN PENYAKIT TIBI", 105, y, { align: "center" });
@@ -140,29 +140,25 @@ export default function ScreenPPKP() {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(12);
 
-    // Format Tarikh ke DD/MM/YYYY
     const formatTarikhDiberi = (tarikhStr) => {
       if (!tarikhStr) return '...................';
       const d = new Date(tarikhStr);
       return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
     };
 
-    // --- Perenggan 1 (Justify, Dynamic Indeks Name) ---
+    // 1. KEMASKINI PERENGGAN 1 & 2 (MENGANDUNGI "UNIT TIBI" DAN MASA "8.30 PAGI")
     const p1 = `Adalah dimaklumkan bahawa penyiasatan pihak kami mendapati Tuan/Puan bernama ${kontak.nama} mempunyai kaitan rapat dengan pesakit Tibi ${kes.nama} yang boleh menyebabkan Tuan/Puan atau individu/mereka yang di bawah jagaan Tuan/Puan turut mendapat jangkitan Tibi.`;
     doc.text(p1, margin, y, { maxWidth: 170, align: "justify" });
     y += (doc.splitTextToSize(p1, 170).length * 6) + 5;
 
-    // --- Perenggan 2 (Justify, Klinik, Tarikh & Masa 8.30) ---
-    const p2 = `2. Oleh yang demikian, Tuan/Puan dan/atau individu/mereka yang di bawah jagaan Tuan/Puan diarah untuk menghadirkan diri ke ${kes.klinik} pada waktu pejabat pada ${formatTarikhDiberi(kontak.tarikh_saringan_1)} pukul 8.30 pagi bagi menjalani pemeriksaan saringan dan pengesahan penyakit Tibi.`;
+    const p2 = `2. Oleh yang demikian, Tuan/Puan dan/atau individu/mereka yang di bawah jagaan Tuan/Puan diarah untuk menghadirkan diri ke Unit Tibi ${kes.klinik} pada waktu pejabat pada ${formatTarikhDiberi(kontak.tarikh_saringan_1)} pukul 8.30 pagi bagi menjalani pemeriksaan saringan dan pengesahan penyakit Tibi.`;
     doc.text(p2, margin, y, { maxWidth: 170, align: "justify" });
     y += (doc.splitTextToSize(p2, 170).length * 6) + 5;
 
-    // --- Perenggan 3 (Justify) ---
     const p3 = `3. Kegagalan Tuan/Puan atau individu/mereka yang dibawah jagaan Tuan/Puan hadir menjalani pemeriksaan boleh ditafsir sebagai enggan bekerjasama bagi membendung penyebaran penyakit berjangkit. Ini memungkinkan Tuan/Puan dikenakan tindakan undang-undang di bawah Seksyen 15, Akta Pencegahan dan Pengawalan Penyakit Berjangkit 1988.`;
     doc.text(p3, margin, y, { maxWidth: 170, align: "justify" });
     y += (doc.splitTextToSize(p3, 170).length * 6) + 12;
 
-    // --- Penutup ---
     doc.text("Sekian, terima kasih.", margin, y);
     y += 12;
 
@@ -174,16 +170,12 @@ export default function ScreenPPKP() {
     doc.text("Saya yang menurut perintah,", margin, y);
     y += 15; 
 
-    // --- LOGIK VARIANT PEGAWAI (MAZIAH / FAUZI) ---
     if (pegawai === 'Maziah') {
       try {
-        // Guna gambar tandatangan + teks yang user upload
         const maziahBase64 = await getBase64ImageFromUrl('/tandatangan-maziah.jpg');
-        // Saiz gambar dilaraskan supaya sepadan (Lebar 100, Tinggi 30)
         doc.addImage(maziahBase64, 'JPEG', margin, y - 5, 100, 30);
         y += 30;
       } catch (err) {
-        // Fallback jika gambar gagal diload
         doc.setFont("helvetica", "bold");
         doc.text("MAZIAH BINTI MD NOOR", margin, y);
         y += 6;
@@ -196,7 +188,6 @@ export default function ScreenPPKP() {
       doc.text("No. Telefon: +60 12-747 8949", margin, y);
     } 
     else {
-      // Variant Fauzi (Teks Sepenuhnya)
       doc.text(".......................................................................", margin, y);
       y += 7;
       doc.setFont("helvetica", "bold");
@@ -214,15 +205,77 @@ export default function ScreenPPKP() {
     const today = new Date().toLocaleDateString('ms-MY');
     doc.text(`Tarikh: ${today}`, margin, y);
 
-    // Simpan fail menggunakan nama kontak
     doc.save(`${kontak.nama}.pdf`);
   };
-  // ==========================================
 
-  const openModal = (kes) => { setSelectedCase(kes); setShowModal(true); };
-  const closeModal = () => { setShowModal(false); setSelectedCase(null); setContactForm({ nama: '', ic_no: '', no_tel: '', alamat: '', tarikh_saringan_1: '', pegawai_notis: 'Maziah' }); };
+  const openModal = (kes) => { 
+    setSelectedCase(kes); 
+    setContactUploadMode('manual');
+    setBulkContacts([]);
+    setShowModal(true); 
+  };
+  
+  const closeModal = () => { 
+    setShowModal(false); 
+    setSelectedCase(null); 
+    setContactForm({ nama: '', ic_no: '', no_tel: '', alamat: '', tarikh_saringan_1: '', pegawai_notis: 'Maziah' }); 
+    setBulkContacts([]);
+  };
+
   const handleContactChange = (e) => { setContactForm({ ...contactForm, [e.target.name]: e.target.value }); };
 
+  // ==========================================
+  // FUNGSI MUAT NAIK EXCEL PUKAL (BULK UPLOAD)
+  // ==========================================
+  const downloadExcelTemplate = () => {
+    const ws = XLSX.utils.json_to_sheet([{
+      'Nama Penuh Kontak': 'Ahmad bin Abu',
+      'No Kad Pengenalan': '900101011234',
+      'No Telefon': '0123456789',
+      'Alamat Rumah': 'No 1, Jalan Raya',
+      'Daerah/Negeri': 'Kulai, Johor',
+      'Tarikh Saringan 1 Diberi': '2026-03-25' // Format YYYY-MM-DD
+    }]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Template_Kontak");
+    XLSX.writeFile(wb, "Template_Muat_Naik_Kontak.xlsx");
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const bstr = evt.target.result;
+      const wb = XLSX.read(bstr, { type: 'binary' });
+      const wsname = wb.SheetNames[0];
+      const ws = wb.Sheets[wsname];
+      const data = XLSX.utils.sheet_to_json(ws, { raw: false, dateNF: 'yyyy-mm-dd' });
+      
+      const formattedData = data.map((row, index) => ({
+        id: index,
+        nama: row['Nama Penuh Kontak'] || '',
+        ic_no: row['No Kad Pengenalan'] || '',
+        no_tel: String(row['No Telefon'] || ''),
+        alamat: row['Alamat Rumah'] || '',
+        daerah_negeri: row['Daerah/Negeri'] || '',
+        tarikh_saringan_1: row['Tarikh Saringan 1 Diberi'] || '',
+        selectedToSave: true,
+        sendSMS: true,
+        genPDF: true,
+      }));
+      setBulkContacts(formattedData);
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const handleBulkCheck = (index, field, value) => {
+    const newBulk = [...bulkContacts];
+    newBulk[index][field] = value;
+    setBulkContacts(newBulk);
+  };
+
+  // Submit Manual
   const handleContactSubmit = async (e) => {
     e.preventDefault();
     setLoadingContact(true);
@@ -235,11 +288,42 @@ export default function ScreenPPKP() {
     if (!error && data) {
       closeModal();
       handleSendSMS(data[0].id, data[0].no_tel, data[0].nama, data[0].tarikh_saringan_1, selectedCase.klinik, 1);
-      
-      // Auto-Jana PDF mengikut pilihan pegawai yang dipilih dalam borang
       await generateNotisPDF(data[0], selectedCase, contactForm.pegawai_notis);
     }
     setLoadingContact(false);
+  };
+
+  // Submit Excel
+  const handleBulkSubmit = async () => {
+    setLoadingContact(true);
+    for (const c of bulkContacts) {
+      if (!c.selectedToSave) continue;
+      
+      const fullAlamat = `${c.alamat}, ${c.daerah_negeri}`; // Gabung alamat & daerah/negeri
+      
+      const { data, error } = await supabase.from('contacts').insert([{
+        index_case_id: selectedCase.id,
+        nama: c.nama,
+        ic_no: c.ic_no,
+        no_tel: c.no_tel,
+        alamat: fullAlamat,
+        tarikh_saringan_1: c.tarikh_saringan_1,
+        sms_status: 'Belum Dihantar'
+      }]).select();
+
+      if (!error && data) {
+        if (c.sendSMS) {
+          await handleSendSMS(data[0].id, data[0].no_tel, data[0].nama, data[0].tarikh_saringan_1, selectedCase.klinik, 1);
+        }
+        if (c.genPDF) {
+          await generateNotisPDF(data[0], selectedCase, contactForm.pegawai_notis);
+        }
+      }
+    }
+    setLoadingContact(false);
+    closeModal();
+    fetchData();
+    alert('Selesai memproses muat naik kontak pukal!');
   };
 
   const toggleContacts = (caseId) => { setExpandedCaseId(expandedCaseId === caseId ? null : caseId); };
@@ -254,7 +338,7 @@ export default function ScreenPPKP() {
       const caseContacts = allContacts.filter(c => c.index_case_id === kes.id);
       if (caseContacts.length === 0) {
         exportData.push({
-          'Tarikh Didaftar': formatDateTime(kes.created_at), 'Klinik': kes.klinik, 'Kategori Indeks': kes.kategori,
+          'Tarikh Didaftar': formatDateTime(kes.created_at), 'No Daftar Tibi': kes.no_daftar_tibi, 'Klinik': kes.klinik, 'Kategori Indeks': kes.kategori,
           'Nama Indeks': kes.nama, 'No K/P Indeks': kes.ic_no, 'Nama Kontak': 'TIADA KONTAK', 'No Tel': '-',
           'Sar. 1 (Diberi)': '-', 'Hadir Sar. 1': '-', 'Sar. 2 (Diberi)': '-', 'Hadir Sar. 2': '-',
           'Sar. 3 (Diberi)': '-', 'Hadir Sar. 3': '-', 'Sar. 4 (Diberi)': '-', 'Hadir Sar. 4': '-',
@@ -262,7 +346,7 @@ export default function ScreenPPKP() {
       } else {
         caseContacts.forEach(kontak => {
           exportData.push({
-            'Tarikh Didaftar': formatDateTime(kes.created_at), 'Klinik': kes.klinik, 'Kategori Indeks': kes.kategori,
+            'Tarikh Didaftar': formatDateTime(kes.created_at), 'No Daftar Tibi': kes.no_daftar_tibi, 'Klinik': kes.klinik, 'Kategori Indeks': kes.kategori,
             'Nama Indeks': kes.nama, 'No K/P Indeks': kes.ic_no, 'Nama Kontak': kontak.nama, 'No Tel': kontak.no_tel,
             'Sar. 1 (Diberi)': kontak.tarikh_saringan_1 || '-', 'Hadir Sar. 1': kontak.tarikh_hadir_1 || 'BELUM',
             'Sar. 2 (Diberi)': kontak.tarikh_saringan_2 || '-', 'Hadir Sar. 2': kontak.tarikh_hadir_2 || 'BELUM',
@@ -370,7 +454,8 @@ export default function ScreenPPKP() {
     th: { padding: '12px', backgroundColor: '#343a40', color: '#fff', textAlign: 'left', borderBottom: '2px solid #ddd' },
     td: { padding: '12px', borderBottom: '1px solid #ddd', verticalAlign: 'middle' },
     modalOverlay: { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 },
-    modalContent: { backgroundColor: 'white', padding: '30px', borderRadius: '8px', minWidth: '400px', position: 'relative', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }
+    modalContent: { backgroundColor: 'white', padding: '30px', borderRadius: '8px', position: 'relative', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' },
+    tabBtn: (active) => ({ flex: 1, padding: '10px', fontWeight: 'bold', cursor: 'pointer', border: 'none', backgroundColor: active ? colors.blue : '#e2e3e5', color: active ? '#fff' : '#333', borderRadius: '4px 4px 0 0' })
   };
 
   return (
@@ -412,14 +497,16 @@ export default function ScreenPPKP() {
       </div>
 
       <div style={s.mainLayout}>
+        {/* BORANG TAMBAH INDEKS */}
         <div style={s.cardLeft}>
           <h3 style={{ marginTop: 0, borderBottom: '1px solid #ddd', paddingBottom: '10px' }}>+ Daftar Kes Indeks</h3>
           <form onSubmit={handleSubmit}>
+            <div style={s.formGroup}><input type="text" name="no_daftar_tibi" placeholder="No. Daftar Tibi" value={formData.no_daftar_tibi} onChange={handleChange} required style={{...s.input, borderColor: colors.blue, borderWidth: '2px'}}/></div>
             <div style={s.formGroup}><input type="text" name="nama" placeholder="Nama Penuh" value={formData.nama} onChange={handleChange} required style={s.input}/></div>
             <div style={s.formGroup}><input type="text" name="ic_no" placeholder="No. Kad Pengenalan" value={formData.ic_no} onChange={handleChange} required style={s.input}/></div>
             <div style={s.formGroup}><input type="text" name="no_tel" placeholder="No. Telefon" value={formData.no_tel} onChange={handleChange} required style={s.input}/></div>
             <div style={s.formGroup}><textarea name="alamat" placeholder="Alamat Rumah" value={formData.alamat} onChange={handleChange} required style={{...s.input, minHeight: '60px'}}/></div>
-            <div style={s.formGroup}><label style={{ fontSize: '13px', fontWeight: 'bold' }}>Tarikh Notifikasi</label><input type="date" name="tarikh_notifikasi" value={formData.tarikh_notifikasi} onChange={handleChange} required style={s.input}/></div>
+            <div style={s.formGroup}><label style={{ fontSize: '13px', fontWeight: 'bold' }}>Tarikh Terima Notifikasi</label><input type="date" name="tarikh_notifikasi" value={formData.tarikh_notifikasi} onChange={handleChange} required style={s.input}/></div>
             <div style={s.formGroup}><label style={{ fontSize: '13px', fontWeight: 'bold' }}>Tarikh Diagnosis</label><input type="date" name="tarikh_diagnosis" value={formData.tarikh_diagnosis} onChange={handleChange} required style={s.input}/></div>
             <div style={s.formGroup}>
               <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Klinik Bertanggungjawab</label>
@@ -466,7 +553,7 @@ export default function ScreenPPKP() {
                     <tr style={{ backgroundColor: kes.is_finished ? '#e9ecef' : 'transparent' }}>
                       <td style={s.td}>
                         {hasOutstanding && <span style={{ width: '10px', height: '10px', backgroundColor: colors.red, borderRadius: '50%', display: 'inline-block', marginRight: '8px', animation: 'pulse 1.5s infinite' }} title="Saringan Tertunggak"></span>}
-                        <strong>{kes.nama}</strong> <br /><span style={{fontSize:'12px', color:'#666'}}>{kes.kategori} | {kes.klinik}</span>
+                        <strong>{kes.nama}</strong> <br /><span style={{fontSize:'12px', color:'#666'}}>No. Tibi: {kes.no_daftar_tibi || '-'} | {kes.kategori} | {kes.klinik}</span>
                       </td>
                       <td style={s.td}>
                         <div style={{ display: 'flex', gap: '15px' }}>
@@ -499,7 +586,6 @@ export default function ScreenPPKP() {
                                       <span style={{ marginLeft: '10px', fontSize: '11px', padding: '3px 8px', borderRadius: '12px', backgroundColor: '#e2e8f0', color: '#475569' }}>Status SMS: {c.sms_status || 'Belum Dihantar'}</span>
                                     </div>
                                     
-                                    {/* BUTANG JANA PDF (2 VARIANT PEGAWAI) */}
                                     <div style={{ display: 'flex', gap: '5px' }}>
                                       <button onClick={() => generateNotisPDF(c, kes, 'Maziah')} style={{ padding: '6px 10px', backgroundColor: colors.purple, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold' }}>
                                         📄 Notis (Maziah)
@@ -545,13 +631,21 @@ export default function ScreenPPKP() {
         <div style={s.modalOverlay}>
           <div style={s.modalContent}>
             <button onClick={() => setShowCalendar(false)} style={{ position: 'absolute', top: '10px', right: '15px', border: 'none', background: 'none', fontSize: '24px', cursor: 'pointer' }}>&times;</button>
-            <h3 style={{ marginTop: 0, textAlign: 'center' }}>Jadual Temujanji</h3>
+            <h3 style={{ marginTop: 0, textAlign: 'center' }}>Jadual Temujanji Mengikut Klinik</h3>
             <div style={{ display: 'flex', justifyContent: 'center', margin: '15px 0' }}><Calendar onChange={setSelectedDate} value={selectedDate} tileContent={tileContent} /></div>
             <div style={{ backgroundColor: '#f9f9f9', padding: '15px', borderRadius: '8px', border: '1px solid #ddd' }}>
               <h4>Temujanji: {selectedDate.toLocaleDateString('ms-MY')}</h4>
               {appointmentsOnSelectedDate.length === 0 ? ( <p>Tiada temujanji.</p> ) : (
                 <ul style={{ fontSize: '14px', paddingLeft: '20px', margin: 0 }}>
-                  {appointmentsOnSelectedDate.map(kontak => <li key={kontak.id}><strong>{kontak.nama}</strong> ({kontak.no_tel}) - Indeks: {indexCases.find(i => i.id === kontak.index_case_id)?.nama || 'Tidak dijumpai'}</li>)}
+                  {appointmentsOnSelectedDate.map(kontak => {
+                    const ks = indexCases.find(i => i.id === kontak.index_case_id);
+                    return (
+                      <li key={kontak.id} style={{ marginBottom: '5px' }}>
+                        <strong>{kontak.nama}</strong> ({kontak.no_tel})<br/>
+                        <span style={{ color: colors.blue, fontWeight: 'bold', fontSize: '12px' }}>Klinik: {ks?.klinik || '-'}</span> <span style={{ color: '#666', fontSize: '12px' }}> | Indeks: {ks?.nama || '-'}</span>
+                      </li>
+                    )
+                  })}
                 </ul>
               )}
             </div>
@@ -559,30 +653,94 @@ export default function ScreenPPKP() {
         </div>
       )}
 
+      {/* MODAL TAMBAH KONTAK (MANUAL & EXCEL BULK) */}
       {showModal && (
         <div style={s.modalOverlay}>
-          <div style={s.modalContent}>
-            <button onClick={closeModal} style={{ position: 'absolute', top: '10px', right: '15px', border: 'none', background: 'none', fontSize: '20px', cursor: 'pointer' }}>&times;</button>
-            <h3 style={{ marginTop: 0, borderBottom: '1px solid #ddd', paddingBottom: '10px' }}>Tambah Kontak</h3>
-            <p style={{ color: '#666' }}>Indeks: <strong style={{color: '#333'}}>{selectedCase?.nama}</strong></p>
-            <form onSubmit={handleContactSubmit}>
-              <div style={s.formGroup}><label style={{ fontSize: '13px', fontWeight: 'bold' }}>Nama Penuh Kontak</label><input type="text" name="nama" value={contactForm.nama} onChange={handleContactChange} required style={s.input}/></div>
-              <div style={s.formGroup}><label style={{ fontSize: '13px', fontWeight: 'bold' }}>No. Kad Pengenalan</label><input type="text" name="ic_no" value={contactForm.ic_no} onChange={handleContactChange} required style={s.input}/></div>
-              <div style={s.formGroup}><label style={{ fontSize: '13px', fontWeight: 'bold' }}>No. Telefon</label><input type="text" name="no_tel" value={contactForm.no_tel} onChange={handleContactChange} required style={s.input}/></div>
-              <div style={s.formGroup}><label style={{ fontSize: '13px', fontWeight: 'bold' }}>Alamat Rumah</label><textarea name="alamat" value={contactForm.alamat} onChange={handleContactChange} required style={{...s.input, minHeight: '60px'}}/></div>
-              <div style={s.formGroup}><label style={{ fontSize: '13px', fontWeight: 'bold' }}>Tarikh Saringan 1 (Diberi)</label><input type="date" name="tarikh_saringan_1" value={contactForm.tarikh_saringan_1} onChange={handleContactChange} required style={s.input}/></div>
-              
-              {/* DROPDOWN PEMILIHAN PEGAWAI */}
-              <div style={s.formGroup}>
-                <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Surat Notis (Auto-PDF)</label>
-                <select name="pegawai_notis" value={contactForm.pegawai_notis} onChange={handleContactChange} style={s.input}>
-                  <option value="Maziah">Maziah Binti Md Noor (Ada Tandatangan)</option>
-                  <option value="Fauzi">Mohd Fauzi Bin Zaini (Teks Sahaja)</option>
-                </select>
-              </div>
+          <div style={{...s.modalContent, width: contactUploadMode === 'excel' ? '90%' : '400px', maxWidth: '1000px', maxHeight: '90vh', overflowY: 'auto'}}>
+            <button onClick={closeModal} style={{ position: 'absolute', top: '10px', right: '15px', border: 'none', background: 'none', fontSize: '20px', cursor: 'pointer', zIndex: 10 }}>&times;</button>
+            
+            <div style={{ display: 'flex', borderBottom: '2px solid #ddd', marginBottom: '20px' }}>
+              <button style={s.tabBtn(contactUploadMode === 'manual')} onClick={() => setContactUploadMode('manual')}>✍️ Tambah Manual</button>
+              <button style={s.tabBtn(contactUploadMode === 'excel')} onClick={() => setContactUploadMode('excel')}>📂 Muat Naik Excel (Pukal)</button>
+            </div>
 
-              <button type="submit" disabled={loadingContact} style={{ width: '100%', padding: '10px', backgroundColor: colors.blue, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', marginTop: '10px' }}>{loadingContact ? 'Memproses...' : 'Simpan, Hantar SMS & Jana Notis (PDF)'}</button>
-            </form>
+            <p style={{ color: '#666', marginBottom: '15px' }}>Indeks: <strong style={{color: '#333'}}>{selectedCase?.nama}</strong></p>
+            
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Surat Notis (Pilihan Pegawai)</label>
+              <select name="pegawai_notis" value={contactForm.pegawai_notis} onChange={handleContactChange} style={s.input}>
+                <option value="Maziah">Maziah Binti Md Noor (Ada Tandatangan)</option>
+                <option value="Fauzi">Mohd Fauzi Bin Zaini (Teks Sahaja)</option>
+              </select>
+            </div>
+
+            {/* TAB 1: MANUAL */}
+            {contactUploadMode === 'manual' && (
+              <form onSubmit={handleContactSubmit}>
+                <div style={s.formGroup}><label style={{ fontSize: '13px', fontWeight: 'bold' }}>Nama Penuh Kontak</label><input type="text" name="nama" value={contactForm.nama} onChange={handleContactChange} required style={s.input}/></div>
+                <div style={s.formGroup}><label style={{ fontSize: '13px', fontWeight: 'bold' }}>No. Kad Pengenalan</label><input type="text" name="ic_no" value={contactForm.ic_no} onChange={handleContactChange} required style={s.input}/></div>
+                <div style={s.formGroup}><label style={{ fontSize: '13px', fontWeight: 'bold' }}>No. Telefon</label><input type="text" name="no_tel" value={contactForm.no_tel} onChange={handleContactChange} required style={s.input}/></div>
+                <div style={s.formGroup}><label style={{ fontSize: '13px', fontWeight: 'bold' }}>Alamat Rumah</label><textarea name="alamat" value={contactForm.alamat} onChange={handleContactChange} required style={{...s.input, minHeight: '60px'}}/></div>
+                <div style={s.formGroup}><label style={{ fontSize: '13px', fontWeight: 'bold' }}>Tarikh Saringan 1 (Diberi)</label><input type="date" name="tarikh_saringan_1" value={contactForm.tarikh_saringan_1} onChange={handleContactChange} required style={s.input}/></div>
+                
+                <button type="submit" disabled={loadingContact} style={{ width: '100%', padding: '10px', backgroundColor: colors.blue, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', marginTop: '10px' }}>{loadingContact ? 'Memproses...' : 'Simpan, Hantar SMS & Jana Notis (PDF)'}</button>
+              </form>
+            )}
+
+            {/* TAB 2: EXCEL BULK UPLOAD */}
+            {contactUploadMode === 'excel' && (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '8px', border: '1px dashed #ccc', marginBottom: '20px' }}>
+                  <div>
+                    <h4 style={{ margin: '0 0 5px 0' }}>Langkah 1: Muat Turun Template</h4>
+                    <p style={{ margin: 0, fontSize: '12px', color: colors.grey }}>Sila guna template rasmi untuk elak ralat susunan lajur.</p>
+                  </div>
+                  <button onClick={downloadExcelTemplate} style={{ padding: '8px 15px', backgroundColor: colors.green, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>📥 Muat Turun Template</button>
+                </div>
+
+                <div style={{ backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '8px', border: '1px dashed #ccc', marginBottom: '20px' }}>
+                  <h4 style={{ margin: '0 0 10px 0' }}>Langkah 2: Muat Naik Fail Lengkap</h4>
+                  <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} style={{ width: '100%' }} />
+                </div>
+
+                {bulkContacts.length > 0 && (
+                  <div>
+                    <h4 style={{ margin: '0 0 10px 0', borderBottom: '2px solid #ddd', paddingBottom: '5px' }}>Langkah 3: Semakan & Pengesahan ({bulkContacts.length} Kontak)</h4>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{...s.table, fontSize: '12px'}}>
+                        <thead>
+                          <tr>
+                            <th style={s.th}>Nama</th>
+                            <th style={s.th}>KP & Tel</th>
+                            <th style={s.th}>Alamat & Daerah</th>
+                            <th style={s.th}>Tarikh S1</th>
+                            <th style={{...s.th, textAlign: 'center'}}>Tindakan Auto</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {bulkContacts.map((c, idx) => (
+                            <tr key={c.id}>
+                              <td style={s.td}><strong>{c.nama}</strong></td>
+                              <td style={s.td}>{c.ic_no}<br/>{c.no_tel}</td>
+                              <td style={s.td}>{c.alamat}<br/>{c.daerah_negeri}</td>
+                              <td style={s.td}>{c.tarikh_saringan_1}</td>
+                              <td style={{...s.td, textAlign: 'left', minWidth: '150px'}}>
+                                <label style={{ display: 'block', marginBottom: '3px' }}><input type="checkbox" checked={c.selectedToSave} onChange={(e) => handleBulkCheck(idx, 'selectedToSave', e.target.checked)} /> 💾 Simpan Rekod</label>
+                                <label style={{ display: 'block', marginBottom: '3px' }}><input type="checkbox" checked={c.sendSMS} onChange={(e) => handleBulkCheck(idx, 'sendSMS', e.target.checked)} disabled={!c.selectedToSave}/> ✉️ Hantar SMS S1</label>
+                                <label style={{ display: 'block' }}><input type="checkbox" checked={c.genPDF} onChange={(e) => handleBulkCheck(idx, 'genPDF', e.target.checked)} disabled={!c.selectedToSave}/> 📄 Jana Notis (PDF)</label>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <button onClick={handleBulkSubmit} disabled={loadingContact} style={{ width: '100%', padding: '12px', backgroundColor: colors.blue, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '15px', marginTop: '15px' }}>
+                      {loadingContact ? 'Memproses Pukal (Sila Tunggu)...' : `Sahkan & Daftar ${bulkContacts.filter(c => c.selectedToSave).length} Kontak`}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
