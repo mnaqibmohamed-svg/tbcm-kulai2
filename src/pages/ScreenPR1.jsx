@@ -98,9 +98,7 @@ export default function ScreenPR1() {
   const handleContactSubmit = async (e) => {
     e.preventDefault();
     setLoadingContact(true);
-    
     const finalStatus = calculateAutoStatus(contactForm);
-    
     const { error } = await supabase.from('contacts').update({
         ...contactForm,
         status_tb: finalStatus
@@ -110,9 +108,7 @@ export default function ScreenPR1() {
       alert('Data klinikal dikemaskini!');
       closeEditModal();
       fetchData();
-    } else {
-      alert('Ralat: ' + error.message);
-    }
+    } else { alert('Ralat: ' + error.message); }
     setLoadingContact(false);
   };
 
@@ -150,11 +146,10 @@ export default function ScreenPR1() {
     const matchKlinik = filterKlinik === 'Semua' || kes.klinik === filterKlinik;
     const matchOutstanding = filterOutstanding ? contacts.some(c => isContactOutstanding(c)) : true;
     const matchPending = filterPending ? contacts.some(c => isContactPending(c)) : true;
-    
     return matchName && matchKlinik && matchOutstanding && matchPending;
   });
 
-  // --- LOGIK KPI ---
+  // --- LOGIK KPI COMPACT ---
   const kpiIndeks = indexCases.length;
   const indeksSP = indexCases.filter(k => k.kategori === 'Smear Positif').length;
   const indeksSN = indexCases.filter(k => k.kategori === 'Smear Negatif').length;
@@ -168,7 +163,15 @@ export default function ScreenPR1() {
   const calcPercent = (n) => {
     if (kpiKontak === 0) return '0%';
     const attended = allContacts.filter(c => c[`tarikh_hadir_${n}`]).length;
-    return `${((attended / kpiKontak) * 100).toFixed(1)}%`;
+    return `${((attended / kpiKontak) * 100).toFixed(0)}%`;
+  };
+
+  const getOutstandingCount = (n) => {
+    return allContacts.filter(c => {
+      const sDate = c[`tarikh_saringan_${n}_baru`] || c[`tarikh_saringan_${n}`];
+      const hDate = c[`tarikh_hadir_${n}`];
+      return sDate && sDate <= todayStr && !hDate;
+    }).length;
   };
 
   // --- LOGIK PENGUMUMAN TEMUJANJI HARI INI ---
@@ -229,19 +232,14 @@ export default function ScreenPR1() {
       await supabase.from('holidays').delete().eq('id', isHoliday.id);
     } else {
       const desc = prompt("Sila masukkan keterangan cuti umum (cth: Hari Raya):");
-      if (desc) {
-        await supabase.from('holidays').insert([{ tarikh: selectedDateStr, keterangan: desc }]);
-      }
+      if (desc) { await supabase.from('holidays').insert([{ tarikh: selectedDateStr, keterangan: desc }]); }
     }
     fetchData();
   };
 
   const openApptModal = (appt = null) => {
-    if (appt) {
-      setApptForm({ id: appt.id, nama: appt.nama, tbk: appt.tbk, tujuan: appt.tujuan.split(', '), klinik: appt.klinik });
-    } else {
-      setApptForm({ id: null, nama: '', tbk: '', tujuan: [], klinik: filterKlinik === 'Semua' ? 'KK Kulai' : filterKlinik });
-    }
+    if (appt) { setApptForm({ id: appt.id, nama: appt.nama, tbk: appt.tbk, tujuan: appt.tujuan.split(', '), klinik: appt.klinik }); } 
+    else { setApptForm({ id: null, nama: '', tbk: '', tujuan: [], klinik: filterKlinik === 'Semua' ? 'KK Kulai' : filterKlinik }); }
     setShowApptModal(true);
   };
 
@@ -254,17 +252,9 @@ export default function ScreenPR1() {
 
   const saveCustomAppt = async (e) => {
     e.preventDefault();
-    const payload = { 
-      tarikh: selectedDateStr, 
-      nama: apptForm.nama, 
-      tbk: apptForm.tbk, 
-      tujuan: apptForm.tujuan.join(', '), 
-      klinik: apptForm.klinik 
-    };
-
+    const payload = { tarikh: selectedDateStr, nama: apptForm.nama, tbk: apptForm.tbk, tujuan: apptForm.tujuan.join(', '), klinik: apptForm.klinik };
     if (apptForm.id) await supabase.from('custom_appointments').update(payload).eq('id', apptForm.id);
     else await supabase.from('custom_appointments').insert([payload]);
-    
     setShowApptModal(false);
     fetchData();
   };
@@ -283,23 +273,23 @@ export default function ScreenPR1() {
     return { color: '#10b981', fontWeight: 'bold' };
   };
 
-  const colors = { dark: '#1e293b', blue: '#007bff', cyan: '#17a2b8', green: '#28a745', yellow: '#ffc107', red: '#dc3545', grey: '#6c757d', purple: '#8b5cf6', orange: '#f97316' };
+  const colors = { dark: '#1e293b', blue: '#007bff', cyan: '#17a2b8', green: '#28a745', yellow: '#ffc107', red: '#dc3545', grey: '#6c757d', orange: '#f97316' };
   const s = {
     page: { padding: '20px', fontFamily: 'Arial, sans-serif', backgroundColor: '#f4f6f9', minHeight: '100vh' },
-    topHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '3px solid #ddd', paddingBottom: '15px', marginBottom: '20px' },
+    topHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '3px solid #ddd', paddingBottom: '15px', marginBottom: '15px' },
     h1: { margin: 0, color: colors.dark, fontSize: '24px' },
     p: { margin: '5px 0 0 0', color: colors.grey },
-    kpiLayout: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', marginBottom: '15px' },
-    kpiCard: (color) => ({ backgroundColor: '#fff', padding: '15px 20px', borderRadius: '8px', borderLeft: `5px solid ${color}`, boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }),
-    table: { width: '100%', borderCollapse: 'collapse', fontSize: '14px', backgroundColor: '#fff', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' },
-    th: { padding: '12px', backgroundColor: '#343a40', color: '#fff', textAlign: 'left', borderBottom: '2px solid #ddd' },
-    td: { padding: '12px', borderBottom: '1px solid #ddd', verticalAlign: 'middle' },
+    kpiCardCompact: (color) => ({ backgroundColor: '#fff', padding: '10px 15px', borderRadius: '6px', borderLeft: `4px solid ${color}`, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }),
+    kpiTitle: { fontSize: '13px', fontWeight: 'bold', color: colors.dark, marginBottom: '4px' },
+    kpiSub: { fontSize: '11px', color: '#555' },
+    table: { width: '100%', borderCollapse: 'collapse', fontSize: '13px', backgroundColor: '#fff', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' },
+    th: { padding: '10px', backgroundColor: '#343a40', color: '#fff', textAlign: 'left', borderBottom: '2px solid #ddd' },
+    td: { padding: '10px', borderBottom: '1px solid #ddd', verticalAlign: 'middle' },
     modalOverlay: { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 },
-    modalContent: { backgroundColor: 'white', padding: '30px', borderRadius: '8px', position: 'relative', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' },
-    input: { padding: '8px', border: '1px solid #ccc', borderRadius: '4px', width: '100%', boxSizing: 'border-box' },
-    formGroup: { display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '12px' },
-    select: { padding: '6px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '13px' },
-    announcement: { backgroundColor: totalToday > 0 ? '#fef3c7' : '#e0f2fe', border: `1px solid ${totalToday > 0 ? '#f59e0b' : '#38bdf8'}`, padding: '15px', borderRadius: '8px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }
+    modalContent: { backgroundColor: 'white', padding: '20px', borderRadius: '8px', position: 'relative', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' },
+    input: { padding: '8px', border: '1px solid #ccc', borderRadius: '4px', width: '100%', boxSizing: 'border-box', fontSize: '13px' },
+    select: { padding: '6px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '13px', width: '100%' },
+    announcement: { backgroundColor: totalToday > 0 ? '#fef3c7' : '#e0f2fe', border: `1px solid ${totalToday > 0 ? '#f59e0b' : '#38bdf8'}`, padding: '10px 15px', borderRadius: '6px', marginBottom: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }
   };
 
   return (
@@ -314,56 +304,58 @@ export default function ScreenPR1() {
           <h1 style={s.h1}>TBCM Kulai (Modul Klinikal)</h1>
           <p style={s.p}>Pengurusan Pesakit - PR1 / Pegawai Perubatan</p>
         </div>
-        <button onClick={handleLogout} style={{ padding: '10px 20px', backgroundColor: colors.red, color: 'white', border: 'none', cursor: 'pointer', borderRadius: '4px', fontWeight: 'bold' }}>Log Keluar</button>
+        <button onClick={handleLogout} style={{ padding: '8px 15px', backgroundColor: colors.red, color: 'white', border: 'none', cursor: 'pointer', borderRadius: '4px', fontWeight: 'bold' }}>Log Keluar</button>
       </div>
 
       {/* PENGUMUMAN TEMUJANJI HARI INI */}
       <div style={s.announcement}>
         <div>
-          <h3 style={{ margin: '0 0 5px 0', color: totalToday > 0 ? '#b45309' : '#0369a1' }}>📅 Makluman Temujanji Hari Ini</h3>
-          <p style={{ margin: 0, fontSize: '14px', color: '#444' }}>
+          <h4 style={{ margin: '0 0 3px 0', color: totalToday > 0 ? '#b45309' : '#0369a1' }}>📅 Makluman Temujanji Hari Ini</h4>
+          <p style={{ margin: 0, fontSize: '13px', color: '#444' }}>
             Anda mempunyai <strong>{totalToday} temujanji</strong> pada hari ini ({new Date().toLocaleDateString('ms-MY')}).
-            {totalToday > 0 && ` Sila klik butang Kalendar PR1 untuk melihat senarai.`}
           </p>
         </div>
-        {totalToday > 0 && <button onClick={() => { setSelectedDate(new Date()); setShowCalendar(true); }} style={{ padding: '8px 15px', backgroundColor: '#f59e0b', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Lihat Senarai Temujanji</button>}
+        {totalToday > 0 && <button onClick={() => { setSelectedDate(new Date()); setShowCalendar(true); }} style={{ padding: '6px 12px', backgroundColor: '#f59e0b', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize:'12px' }}>Lihat Kalendar</button>}
       </div>
 
-      {/* KAD KPI (INDEKS, KONTAK, SARINGAN) */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
-        <div style={s.kpiCard(colors.blue)}>
-          <h3 style={{ margin: '0 0 8px 0', color: colors.dark }}>Jumlah Kes Indeks: {kpiIndeks}</h3>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: colors.grey, borderTop: '1px solid #eee', paddingTop: '8px' }}>
-            <span>Smear Positif: <strong>{indeksSP}</strong></span>
-            <span>Smear Negatif: <strong>{indeksSN}</strong></span>
-            <span>Extra PTB: <strong>{indeksEPTB}</strong></span>
+      {/* KPI COMPACT (1 BARIS SAHAJA) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '15px' }}>
+        <div style={s.kpiCardCompact(colors.blue)}>
+          <div style={s.kpiTitle}>Indeks: {kpiIndeks}</div>
+          <div style={s.kpiSub}>SP: {indeksSP} | SN: {indeksSN} | EPTB: {indeksEPTB}</div>
+        </div>
+        <div style={s.kpiCardCompact(colors.cyan)}>
+          <div style={s.kpiTitle}>Kontak: {kpiKontak}</div>
+          <div style={s.kpiSub}>SP: {kontakSP} | SN: {kontakSN} | EPTB: {kontakEPTB}</div>
+        </div>
+        <div style={s.kpiCardCompact(colors.green)}>
+          <div style={s.kpiTitle}>Peratus Hadir Saringan</div>
+          <div style={s.kpiSub}>
+            <span style={{marginRight:'5px'}}>S1: <strong>{calcPercent(1)}</strong></span>
+            <span style={{marginRight:'5px'}}>S2: <strong>{calcPercent(2)}</strong></span>
+            <span style={{marginRight:'5px'}}>S3: <strong>{calcPercent(3)}</strong></span>
+            <span>S4: <strong>{calcPercent(4)}</strong></span>
           </div>
         </div>
-        <div style={s.kpiCard(colors.cyan)}>
-          <h3 style={{ margin: '0 0 8px 0', color: colors.dark }}>Jumlah Kontak: {kpiKontak}</h3>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: colors.grey, borderTop: '1px solid #eee', paddingTop: '8px' }}>
-            <span>Drpd SP: <strong>{kontakSP}</strong></span>
-            <span>Drpd SN: <strong>{kontakSN}</strong></span>
-            <span>Drpd EPTB: <strong>{kontakEPTB}</strong></span>
+        <div style={s.kpiCardCompact(colors.red)}>
+          <div style={s.kpiTitle}>Tertunggak (Outstanding)</div>
+          <div style={s.kpiSub}>
+            <span style={{marginRight:'8px'}}>S1: <strong style={{color:colors.red}}>{getOutstandingCount(1)}</strong></span>
+            <span style={{marginRight:'8px'}}>S2: <strong style={{color:colors.red}}>{getOutstandingCount(2)}</strong></span>
+            <span style={{marginRight:'8px'}}>S3: <strong style={{color:colors.red}}>{getOutstandingCount(3)}</strong></span>
+            <span>S4: <strong style={{color:colors.red}}>{getOutstandingCount(4)}</strong></span>
           </div>
         </div>
-      </div>
-
-      <div style={{...s.kpiLayout, gridTemplateColumns: 'repeat(4, 1fr)'}}>
-        <div style={s.kpiCard(colors.green)}><h2 style={{margin:0, color: colors.dark}}>{calcPercent(1)}</h2><p style={{margin:0, fontSize:'12px', color:colors.grey, fontWeight:'bold'}}>Hadir Saringan 1</p></div>
-        <div style={s.kpiCard(colors.green)}><h2 style={{margin:0, color: colors.dark}}>{calcPercent(2)}</h2><p style={{margin:0, fontSize:'12px', color:colors.grey, fontWeight:'bold'}}>Hadir Saringan 2</p></div>
-        <div style={s.kpiCard(colors.green)}><h2 style={{margin:0, color: colors.dark}}>{calcPercent(3)}</h2><p style={{margin:0, fontSize:'12px', color:colors.grey, fontWeight:'bold'}}>Hadir Saringan 3</p></div>
-        <div style={s.kpiCard(colors.green)}><h2 style={{margin:0, color: colors.dark}}>{calcPercent(4)}</h2><p style={{margin:0, fontSize:'12px', color:colors.grey, fontWeight:'bold'}}>Hadir Saringan 4</p></div>
       </div>
 
       {/* JADUAL UTAMA */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap', gap: '10px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '10px' }}>
         <h3 style={{ margin: 0 }}>Senarai Kes & Kemaskini Klinikal</h3>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <button onClick={() => setShowCalendar(true)} style={{ padding: '8px 12px', backgroundColor: colors.cyan, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>📅 Kalendar Induk PR1</button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button onClick={() => setShowCalendar(true)} style={{ padding: '6px 12px', backgroundColor: colors.cyan, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize:'13px' }}>📅 Kalendar Induk PR1</button>
           
-          <input type="text" placeholder="Cari Nama/KP..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }} />
-          <select value={filterKlinik} onChange={(e) => setFilterKlinik(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}>
+          <input type="text" placeholder="Cari Nama/KP..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ padding: '6px', borderRadius: '4px', border: '1px solid #ccc', fontSize:'13px' }} />
+          <select value={filterKlinik} onChange={(e) => setFilterKlinik(e.target.value)} style={{ padding: '6px', borderRadius: '4px', border: '1px solid #ccc', fontSize:'13px' }}>
             <option value="Semua">Semua Klinik</option><option value="KK Kulai">KK Kulai</option><option value="KK Kulai Besar">KK Kulai Besar</option>
           </select>
           
@@ -380,7 +372,7 @@ export default function ScreenPR1() {
         <thead>
           <tr>
             <th style={s.th}>Kes Indeks & Outstanding</th>
-            <th style={s.th}>Statistik Saringan Kontak</th>
+            <th style={s.th}>Summary Kehadiran Kontak</th>
             <th style={{...s.th, textAlign: 'right'}}>Tindakan</th>
           </tr>
         </thead>
@@ -396,10 +388,9 @@ export default function ScreenPR1() {
                   <td style={s.td}>
                     {hasOutstanding && <span style={{ width: '10px', height: '10px', backgroundColor: colors.red, borderRadius: '50%', display: 'inline-block', marginRight: '8px', animation: 'pulse 1.5s infinite' }} title="Saringan Tertunggak"></span>}
                     <strong>{kes.nama}</strong> <br/>
-                    <span style={{fontSize:'12px', color:'#666'}}>No Tibi: <strong>{kes.no_daftar_tibi || '-'}</strong> | {kes.klinik}</span>
+                    <span style={{fontSize:'11px', color:'#666'}}>No Tibi: <strong>{kes.no_daftar_tibi || '-'}</strong> | {kes.klinik}</span>
                   </td>
                   
-                  {/* SUMMARY S1-S4 KEMBALI DI SINI */}
                   <td style={s.td}>
                     <div style={{ display: 'flex', gap: '15px' }}>
                       {[1, 2, 3, 4].map(n => {
@@ -410,7 +401,7 @@ export default function ScreenPR1() {
                   </td>
                   
                   <td style={{...s.td, textAlign: 'right'}}>
-                    <button onClick={() => setExpandedCaseId(isExpanded ? null : kes.id)} style={{ padding: '6px 12px', backgroundColor: colors.blue, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+                    <button onClick={() => setExpandedCaseId(isExpanded ? null : kes.id)} style={{ padding: '6px 12px', backgroundColor: colors.blue, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize:'12px' }}>
                       {isExpanded ? 'Tutup Senarai' : 'Klinikal Kontak'}
                     </button>
                   </td>
@@ -420,9 +411,9 @@ export default function ScreenPR1() {
                   <tr>
                     <td colSpan="3" style={{ padding: '15px', backgroundColor: '#f8f9fa', borderBottom: '2px solid #ddd' }}>
                       <div style={{ borderLeft: `3px solid ${colors.blue}`, paddingLeft: '15px' }}>
-                        {caseContacts.length === 0 ? ( <p style={{ color: '#666', fontStyle: 'italic', margin: 0 }}>Tiada kontak didaftarkan lagi.</p> ) : (
+                        {caseContacts.length === 0 ? ( <p style={{ color: '#666', fontStyle: 'italic', margin: 0, fontSize:'13px' }}>Tiada kontak didaftarkan lagi.</p> ) : (
                           <div style={{ overflowX: 'auto' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', backgroundColor: '#fff' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', backgroundColor: '#fff' }}>
                               <thead>
                                 <tr style={{ backgroundColor: '#e2e8f0' }}>
                                   <th style={{ padding: '8px', border: '1px solid #ccc', textAlign: 'left' }}>Nama Kontak & Status</th>
@@ -437,9 +428,9 @@ export default function ScreenPR1() {
                                 {caseContacts.map(c => (
                                   <tr key={c.id}>
                                     <td style={{ padding: '10px', border: '1px solid #ccc' }}>
-                                      <strong>{c.nama}</strong><br/>
+                                      <strong style={{fontSize:'13px'}}>{c.nama}</strong><br/>
                                       <span style={{ fontSize:'11px', color: '#666'}}>KP: {c.ic_no}</span><br/>
-                                      <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', backgroundColor: c.status_tb === 'Tiada TB' ? '#dcfce7' : c.status_tb === 'Aktif TB' ? '#fee2e2' : '#fef3c7', color: '#333' }}>
+                                      <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold', backgroundColor: c.status_tb === 'Tiada TB' ? '#dcfce7' : c.status_tb === 'Aktif TB' ? '#fee2e2' : '#fef3c7', color: '#333', display:'inline-block', marginTop:'3px' }}>
                                         {c.status_tb || 'Dalam Saringan'}
                                       </span>
                                     </td>
@@ -468,7 +459,7 @@ export default function ScreenPR1() {
                                     ))}
                                     
                                     <td style={{ padding: '10px', border: '1px solid #ccc', textAlign: 'center' }}>
-                                      <button onClick={() => openEditModal(c)} style={{ padding: '6px 10px', backgroundColor: colors.green, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}>
+                                      <button onClick={() => openEditModal(c)} style={{ padding: '6px 10px', backgroundColor: colors.green, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px' }}>
                                         ✏️ Isi Keputusan
                                       </button>
                                     </td>
@@ -488,7 +479,7 @@ export default function ScreenPR1() {
         </tbody>
       </table>
 
-      {/* KALENDAR PR1 MODAL (DENGAN NO DAFTAR TIBI) */}
+      {/* KALENDAR PR1 MODAL */}
       {showCalendar && (
         <div style={s.modalOverlay}>
           <div style={{...s.modalContent, width: '700px', maxWidth: '95vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column'}}>
@@ -503,7 +494,7 @@ export default function ScreenPR1() {
                 </div>
                 
                 <div style={{ marginTop: '15px', textAlign: 'center' }}>
-                  <button onClick={toggleHoliday} style={{ padding: '8px 15px', backgroundColor: isHoliday ? '#fff' : '#ef4444', color: isHoliday ? '#ef4444' : '#fff', border: `2px solid #ef4444`, borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', width: '100%' }}>
+                  <button onClick={toggleHoliday} style={{ padding: '8px 15px', backgroundColor: isHoliday ? '#fff' : '#ef4444', color: isHoliday ? '#ef4444' : '#fff', border: `2px solid #ef4444`, borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', width: '100%', fontSize:'13px' }}>
                     {isHoliday ? '❌ Batal Cuti Umum' : '🛑 Tandakan Cuti Umum'}
                   </button>
                   {isHoliday && <p style={{ fontSize: '13px', color: '#ef4444', fontWeight: 'bold', margin: '5px 0 0 0' }}>{isHoliday.keterangan}</p>}
@@ -513,14 +504,14 @@ export default function ScreenPR1() {
               <div style={{ flex: 1, backgroundColor: '#f9f9f9', padding: '15px', borderRadius: '8px', border: '1px solid #ddd', overflowY: 'auto' }}>
                 <div style={{ position: 'sticky', top: 0, backgroundColor: '#f9f9f9', zIndex: 2, paddingBottom: '10px', borderBottom: '2px solid #ddd', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h4 style={{ margin: 0 }}>{selectedDate.toLocaleDateString('ms-MY')}</h4>
-                  <button onClick={() => openApptModal()} style={{ padding: '4px 8px', backgroundColor: colors.blue, color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>+ Tambah</button>
+                  <button onClick={() => openApptModal()} style={{ padding: '4px 8px', backgroundColor: colors.blue, color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold' }}>+ Tambah</button>
                 </div>
 
                 {isHoliday ? (
                   <div style={{ padding: '20px', textAlign: 'center', color: '#ef4444', fontWeight: 'bold' }}>CUTI UMUM: {isHoliday.keterangan}</div>
                 ) : (
                   <>
-                    <h5 style={{ color: colors.orange, borderBottom: '1px solid #ccc', paddingBottom: '4px' }}>Kontak Auto (PPKP)</h5>
+                    <h5 style={{ color: colors.orange, borderBottom: '1px solid #ccc', paddingBottom: '4px', fontSize:'13px' }}>Kontak Auto (PPKP)</h5>
                     {appointmentsOnSelectedDate.length === 0 ? <p style={{fontSize:'12px', color:'#888'}}>Tiada rekod kontak.</p> : (
                       <ul style={{ fontSize: '12px', paddingLeft: '15px', margin: '0 0 15px 0' }}>
                         {appointmentsOnSelectedDate.map(c => {
@@ -528,7 +519,6 @@ export default function ScreenPR1() {
                           return (
                             <li key={c.id} style={{ marginBottom: '5px' }}>
                               <strong>{c.nama}</strong> ({c.status_tb || 'Dalam Saringan'})<br/>
-                              {/* NO DAFTAR TIBI DITAMBAH DI SINI */}
                               <span style={{ color: '#666', fontSize: '11px' }}>No. Tibi: <strong>{ks?.no_daftar_tibi || '-'}</strong> | Indeks: {ks?.nama || '-'}</span>
                             </li>
                           );
@@ -536,12 +526,12 @@ export default function ScreenPR1() {
                       </ul>
                     )}
 
-                    <h5 style={{ color: colors.blue, borderBottom: '1px solid #ccc', paddingBottom: '4px' }}>Temujanji Custom (PR1)</h5>
+                    <h5 style={{ color: colors.blue, borderBottom: '1px solid #ccc', paddingBottom: '4px', fontSize:'13px' }}>Temujanji Custom (PR1)</h5>
                     {customApptsOnSelected.length === 0 ? <p style={{fontSize:'12px', color:'#888'}}>Tiada rekod custom.</p> : (
                       <ul style={{ fontSize: '12px', paddingLeft: '0', listStyle: 'none', margin: 0 }}>
                         {customApptsOnSelected.map(a => (
                           <li key={a.id} style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#fff', border: '1px solid #ccc', borderRadius: '4px', position: 'relative' }}>
-                            <button onClick={() => openApptModal(a)} style={{ position: 'absolute', top: '5px', right: '5px', background: 'none', border: 'none', cursor: 'pointer' }}>✏️</button>
+                            <button onClick={() => openApptModal(a)} style={{ position: 'absolute', top: '5px', right: '5px', background: 'none', border: 'none', cursor: 'pointer', fontSize:'14px' }}>✏️</button>
                             <strong>{a.nama}</strong><br/>
                             TBK: {a.tbk} | Tujuan: <span style={{color: colors.blue, fontWeight: 'bold'}}>{a.tujuan}</span>
                           </li>
@@ -582,9 +572,9 @@ export default function ScreenPR1() {
               </div>
 
               <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
-                <button type="submit" style={{ flex: 1, padding: '8px', backgroundColor: colors.blue, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Simpan</button>
-                {apptForm.id && <button type="button" onClick={() => deleteCustomAppt(apptForm.id)} style={{ padding: '8px', backgroundColor: colors.red, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>🗑️ Padam</button>}
-                <button type="button" onClick={() => setShowApptModal(false)} style={{ padding: '8px', backgroundColor: '#ccc', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Batal</button>
+                <button type="submit" style={{ flex: 1, padding: '8px', backgroundColor: colors.blue, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize:'13px' }}>Simpan</button>
+                {apptForm.id && <button type="button" onClick={() => deleteCustomAppt(apptForm.id)} style={{ padding: '8px', backgroundColor: colors.red, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize:'13px' }}>🗑️ Padam</button>}
+                <button type="button" onClick={() => setShowApptModal(false)} style={{ padding: '8px', backgroundColor: '#ccc', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize:'13px' }}>Batal</button>
               </div>
             </form>
           </div>
@@ -595,49 +585,49 @@ export default function ScreenPR1() {
       {showModal && selectedContact && (
         <div style={s.modalOverlay}>
           <div style={{...s.modalContent, width: '90%', maxWidth: '900px', maxHeight: '90vh', overflowY: 'auto'}}>
-            <button onClick={closeEditModal} style={{ position: 'absolute', top: '10px', right: '15px', border: 'none', background: 'none', fontSize: '20px', cursor: 'pointer', zIndex: 10 }}>&times;</button>
-            <h2 style={{ marginTop: 0, borderBottom: '2px solid #ddd', paddingBottom: '10px' }}>Rekod Klinikal Kontak: <span style={{color: colors.blue}}>{selectedContact.nama}</span></h2>
+            <button onClick={closeEditModal} style={{ position: 'absolute', top: '10px', right: '15px', border: 'none', background: 'none', fontSize: '24px', cursor: 'pointer', zIndex: 10 }}>&times;</button>
+            <h2 style={{ marginTop: 0, borderBottom: '2px solid #ddd', paddingBottom: '10px', fontSize:'20px' }}>Rekod Klinikal Kontak: <span style={{color: colors.blue}}>{selectedContact.nama}</span></h2>
             
             <form onSubmit={handleContactSubmit}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
                 
                 {[1, 2, 3, 4].map(n => (
                   <div key={n} style={{ backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '8px', border: '1px solid #ccc' }}>
-                    <h4 style={{ margin: '0 0 10px 0', backgroundColor: colors.dark, color: 'white', padding: '5px 10px', borderRadius: '4px' }}>Saringan {n}</h4>
+                    <h4 style={{ margin: '0 0 10px 0', backgroundColor: colors.dark, color: 'white', padding: '5px 10px', borderRadius: '4px', fontSize:'14px' }}>Saringan {n}</h4>
                     
                     <div style={s.formGroup}>
-                      <label style={{fontSize:'12px', fontWeight:'bold'}}>Tarikh Diberi (Asal)</label>
+                      <label style={{fontSize:'11px', fontWeight:'bold'}}>Tarikh Diberi (Asal)</label>
                       <input type="date" value={contactForm[`tarikh_saringan_${n}`] || ''} onChange={(e) => handleContactChange(`tarikh_saringan_${n}`, e.target.value)} style={s.input}/>
                     </div>
                     
                     <div style={s.formGroup}>
-                      <label style={{fontSize:'12px', fontWeight:'bold', color: colors.red}}>Tarikh Saringan Baru (Ganti)</label>
+                      <label style={{fontSize:'11px', fontWeight:'bold', color: colors.red}}>Tarikh Saringan Baru (Ganti)</label>
                       <input type="date" value={contactForm[`tarikh_saringan_${n}_baru`] || ''} onChange={(e) => handleContactChange(`tarikh_saringan_${n}_baru`, e.target.value)} style={{...s.input, borderColor: colors.red}}/>
                     </div>
                     
                     <div style={{ borderTop: '1px dashed #ccc', margin: '10px 0' }}></div>
                     
                     <div style={s.formGroup}>
-                      <label style={{fontSize:'12px', fontWeight:'bold', color: colors.green}}>Tarikh Hadir (Klinik)</label>
+                      <label style={{fontSize:'11px', fontWeight:'bold', color: colors.green}}>Tarikh Hadir (Klinik)</label>
                       <input type="date" value={contactForm[`tarikh_hadir_${n}`] || ''} onChange={(e) => handleContactChange(`tarikh_hadir_${n}`, e.target.value)} style={{...s.input, backgroundColor: '#dcfce7'}}/>
                     </div>
 
                     <div style={s.formGroup}>
-                      <label style={{fontSize:'12px', fontWeight:'bold'}}>Ujian IGRA</label>
+                      <label style={{fontSize:'11px', fontWeight:'bold'}}>Ujian IGRA</label>
                       <select value={contactForm[`igra_${n}`] || ''} onChange={(e) => handleContactChange(`igra_${n}`, e.target.value)} style={s.select}>
                         <option value="">Tiada Data</option><option value="Tidak Dibuat">Tidak Dibuat</option><option value="Pending">Pending / Menunggu</option><option value="Negatif">Negatif</option><option value="Positif">Positif</option>
                       </select>
                     </div>
 
                     <div style={s.formGroup}>
-                      <label style={{fontSize:'12px', fontWeight:'bold'}}>Ujian Mantoux</label>
+                      <label style={{fontSize:'11px', fontWeight:'bold'}}>Ujian Mantoux</label>
                       <select value={contactForm[`mantoux_${n}`] || ''} onChange={(e) => handleContactChange(`mantoux_${n}`, e.target.value)} style={s.select}>
                         <option value="">Tiada Data</option><option value="Tidak Dibuat">Tidak Dibuat</option><option value="Pending">Pending / Menunggu</option><option value="Negatif">Negatif</option><option value="Positif">Positif</option>
                       </select>
                     </div>
 
                     <div style={s.formGroup}>
-                      <label style={{fontSize:'12px', fontWeight:'bold'}}>Ujian CXR</label>
+                      <label style={{fontSize:'11px', fontWeight:'bold'}}>Ujian CXR</label>
                       <select value={contactForm[`cxr_${n}`] || ''} onChange={(e) => handleContactChange(`cxr_${n}`, e.target.value)} style={s.select}>
                         <option value="">Tiada Data</option><option value="Tidak Dibuat">Tidak Dibuat</option><option value="Pending">Pending / Menunggu</option><option value="Normal">Normal</option><option value="Abnormal">Abnormal</option>
                       </select>
@@ -650,12 +640,12 @@ export default function ScreenPR1() {
 
               <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#e2e8f0', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <h4 style={{ margin: 0 }}>Status Automatik Sistem:</h4>
+                  <h4 style={{ margin: 0, fontSize:'14px' }}>Status Automatik Sistem:</h4>
                   <span style={{ fontSize: '18px', fontWeight: 'bold', color: contactForm.status_tb === 'Aktif TB' ? colors.red : contactForm.status_tb === 'Tiada TB' ? colors.green : colors.blue }}>
                     {calculateAutoStatus(contactForm)}
                   </span>
                 </div>
-                <button type="submit" disabled={loadingContact} style={{ padding: '12px 25px', backgroundColor: colors.green, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '16px' }}>
+                <button type="submit" disabled={loadingContact} style={{ padding: '10px 20px', backgroundColor: colors.green, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>
                   {loadingContact ? 'Menyimpan...' : '💾 Simpan & Sahkan Keputusan'}
                 </button>
               </div>

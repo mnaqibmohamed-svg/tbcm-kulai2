@@ -93,7 +93,7 @@ export default function ScreenPPKP() {
       fetchData();
       
       const mesej = `PKD Kulai: Salam En/Pn ${namaKontak}. Anda mempunyai temujanji Saringan TB di ${klinik} pada ${tarikhSaringan}. Sila hadir mengikut jadual.`;
-      const apiKey = 'TAMPAL_API_KEY_ANDA_DI_SINI'; 
+      const apiKey = 'fea7875864e5a9e124b1080109b5dd8b'; 
       
       let formatTel = noTel.replace(/[^0-9]/g, ''); 
       if (formatTel.startsWith('0')) formatTel = '6' + formatTel; 
