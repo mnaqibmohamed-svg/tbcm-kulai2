@@ -4,7 +4,7 @@ import { supabase } from '../supabaseClient';
 import * as XLSX from 'xlsx'; 
 import Calendar from 'react-calendar'; 
 import 'react-calendar/dist/Calendar.css'; 
-import { jsPDF } from 'jspdf'; // Import library PDF
+import { jsPDF } from 'jspdf'; 
 
 export default function ScreenPPKP() {
   const navigate = useNavigate();
@@ -77,7 +77,7 @@ export default function ScreenPPKP() {
       fetchData();
       
       const mesej = `PKD Kulai: Salam En/Pn ${namaKontak}. Anda mempunyai temujanji Saringan TB di ${klinik} pada ${tarikhSaringan}. Sila hadir mengikut jadual.`;
-      const apiKey = 'fea7875864e5a9e124b1080109b5dd8b'; // Kekalkan API Key anda di sini
+      const apiKey = 'TAMPAL_API_KEY_ANDA_DI_SINI'; 
       
       let formatTel = noTel.replace(/[^0-9]/g, ''); 
       if (formatTel.startsWith('0')) formatTel = '6' + formatTel; 
@@ -100,14 +100,45 @@ export default function ScreenPPKP() {
   };
 
   // ==========================================
-  // FUNGSI JANA PDF NOTIS SARINGAN TIBI
+  // FUNGSI BANTUAN UNTUK GAMBAR PDF
   // ==========================================
-  const generateNotisPDF = (kontak, klinik) => {
+  const getBase64ImageFromUrl = async (imageUrl) => {
+    const res = await fetch(imageUrl);
+    const blob = await res.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.addEventListener("load", () => resolve(reader.result), false);
+      reader.onerror = () => reject(this);
+      reader.readAsDataURL(blob);
+    });
+  };
+
+  // ==========================================
+  // FUNGSI JANA PDF NOTIS SARINGAN TIBI TERKINI
+  // ==========================================
+  const generateNotisPDF = async (kontak, klinik) => {
     const doc = new jsPDF();
     const margin = 20;
-    let y = 30;
+    let y = 15; // Mula lebih atas untuk ruang logo
 
-    // Header
+    try {
+      // Dapatkan gambar dari folder public
+      const jataBase64 = await getBase64ImageFromUrl('/jata.jpg');
+      const kkmBase64 = await getBase64ImageFromUrl('/kkm.jpg');
+      
+      // Masukkan logo bersebelahan di tengah-tengah (Center of A4 is 105)
+      // Jata diletak di paksi X:70, KKM di paksi X:110. Saiz diselaraskan.
+      doc.addImage(jataBase64, 'JPEG', 72, y, 28, 22);
+      doc.addImage(kkmBase64, 'JPEG', 110, y, 22, 22);
+      
+      y += 35; // Jarakkan tulisan dari logo
+    } catch (err) {
+      console.error("Gagal memuat turun logo untuk PDF", err);
+      // Jika logo gagal dimuatkan (contoh: belum letak dlm folder), teks tetap akan dijana
+      y += 15; 
+    }
+
+    // Header Tajuk
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
     doc.text("NOTIS MENJALANI PEMERIKSAAN PENGESAHAN PENYAKIT TIBI", 105, y, { align: "center" });
@@ -145,7 +176,7 @@ export default function ScreenPPKP() {
     // Tandatangan & Butiran Pegawai
     doc.setFont("helvetica", "normal");
     doc.text("Saya yang menurut perintah,", margin, y);
-    y += 30; // Ruang kosong untuk tandatangan
+    y += 30; 
 
     doc.text(".......................................................................", margin, y);
     y += 7;
@@ -187,8 +218,8 @@ export default function ScreenPPKP() {
       closeModal();
       handleSendSMS(data[0].id, data[0].no_tel, data[0].nama, data[0].tarikh_saringan_1, selectedCase.klinik, 1);
       
-      // Auto-Jana PDF selepas daftar kontak
-      generateNotisPDF(data[0], selectedCase.klinik);
+      // Auto-Jana PDF (Tunggu gambar siap diproses)
+      await generateNotisPDF(data[0], selectedCase.klinik);
     }
     setLoadingContact(false);
   };
@@ -450,7 +481,6 @@ export default function ScreenPPKP() {
                                       <span style={{ marginLeft: '10px', fontSize: '11px', padding: '3px 8px', borderRadius: '12px', backgroundColor: '#e2e8f0', color: '#475569' }}>Status SMS: {c.sms_status || 'Belum Dihantar'}</span>
                                     </div>
                                     
-                                    {/* BUTANG JANA PDF UNTUK KONTAK INI */}
                                     <button onClick={() => generateNotisPDF(c, kes.klinik)} style={{ padding: '6px 12px', backgroundColor: colors.purple, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>
                                       📄 Cetak Notis PDF
                                     </button>
