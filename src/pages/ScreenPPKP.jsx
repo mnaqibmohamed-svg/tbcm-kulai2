@@ -74,14 +74,17 @@ export default function ScreenPPKP() {
     try {
       await supabase.from('contacts').update({ sms_status: `Sedang Dihantar (S${saringanLvl})...` }).eq('id', kontakId);
       fetchData();
+      
       const mesej = `PKD Kulai: Salam En/Pn ${namaKontak}. Anda mempunyai temujanji Saringan TB di ${klinik} pada ${tarikhSaringan}. Sila hadir mengikut jadual.`;
-      const apiKey = 'fea7875864e5a9e124b1080109b5dd8b'; 
+      const apiKey = 'fea7875864e5a9e124b1080109b5dd8b'; // Pastikan API key anda masih di sini
+      
       let formatTel = noTel.replace(/[^0-9]/g, ''); 
       if (formatTel.startsWith('0')) formatTel = '6' + formatTel; 
-      const targetUrl = `https://www.sms123.net/api/send.php?apiKey=${apiKey}&recipients=${formatTel}&messageContent=${encodeURIComponent(mesej)}`;
-      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
       
-      const response = await fetch(proxyUrl, { method: 'GET' });
+      // KITA GUNA VERCEL PROXY YANG KITA BUAT DALAM VERCEL.JSON TADI
+      const targetUrl = `/api/sms?apiKey=${apiKey}&recipients=${formatTel}&messageContent=${encodeURIComponent(mesej)}`;
+      
+      const response = await fetch(targetUrl, { method: 'GET' });
       const responseText = await response.text();
       
       if (responseText.toLowerCase().includes('ok') || responseText.toLowerCase().includes('success')) {

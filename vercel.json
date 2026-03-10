@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/api/sms",
+      "destination": "https://www.sms123.net/api/send.php"
+    },
+    {
       "source": "/(.*)",
       "destination": "/"
     }
