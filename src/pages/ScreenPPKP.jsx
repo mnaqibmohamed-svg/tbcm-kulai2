@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient';
 import * as XLSX from 'xlsx'; 
 import Calendar from 'react-calendar'; 
 import 'react-calendar/dist/Calendar.css'; 
+import { jsPDF } from 'jspdf'; // Import library PDF
 
 export default function ScreenPPKP() {
   const navigate = useNavigate();
@@ -76,12 +77,11 @@ export default function ScreenPPKP() {
       fetchData();
       
       const mesej = `PKD Kulai: Salam En/Pn ${namaKontak}. Anda mempunyai temujanji Saringan TB di ${klinik} pada ${tarikhSaringan}. Sila hadir mengikut jadual.`;
-      const apiKey = 'fea7875864e5a9e124b1080109b5dd8b'; // Pastikan API key anda masih di sini
+      const apiKey = 'fea7875864e5a9e124b1080109b5dd8b'; // Kekalkan API Key anda di sini
       
       let formatTel = noTel.replace(/[^0-9]/g, ''); 
       if (formatTel.startsWith('0')) formatTel = '6' + formatTel; 
       
-      // KITA GUNA VERCEL PROXY YANG KITA BUAT DALAM VERCEL.JSON TADI
       const targetUrl = `/api/sms?apiKey=${apiKey}&recipients=${formatTel}&messageContent=${encodeURIComponent(mesej)}`;
       
       const response = await fetch(targetUrl, { method: 'GET' });
@@ -99,6 +99,77 @@ export default function ScreenPPKP() {
     }
   };
 
+  // ==========================================
+  // FUNGSI JANA PDF NOTIS SARINGAN TIBI
+  // ==========================================
+  const generateNotisPDF = (kontak, klinik) => {
+    const doc = new jsPDF();
+    const margin = 20;
+    let y = 30;
+
+    // Header
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text("NOTIS MENJALANI PEMERIKSAAN PENGESAHAN PENYAKIT TIBI", 105, y, { align: "center" });
+
+    y += 20;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(12);
+
+    // Perenggan 1
+    const p1 = `Adalah dimaklumkan bahawa penyiasatan pihak kami mendapati tuan/puan bernama ${kontak.nama} mempunyai kaitan rapat dengan pesakit Tibi yang boleh menyebabkan tuan/puan atau individu/mereka yang di bawah jagaan tuan/puan turut mendapat jangkitan Tibi.`;
+    const p1Lines = doc.splitTextToSize(p1, 170);
+    doc.text(p1Lines, margin, y);
+    y += (p1Lines.length * 7) + 5;
+
+    // Perenggan 2
+    const p2 = `2. Oleh yang demikian, tuan/puan dan/atau individu/mereka yang di bawah jagaan tuan/puan diarah untuk menghadirkan diri ke ${klinik} pada waktu pejabat dalam tempoh 2 minggu dari tarikh surat ini bagi menjalani pemeriksaan saringan dan pengesahan penyakit Tibi.`;
+    const p2Lines = doc.splitTextToSize(p2, 170);
+    doc.text(p2Lines, margin, y);
+    y += (p2Lines.length * 7) + 5;
+
+    // Perenggan 3
+    const p3 = `3. Kegagalan tuan/puan atau individu/mereka yang dibawah jagaan tuan/puan hadir menjalani pemeriksaan boleh ditafsir sebagai enggan bekerjasama bagi membendung penyebaran penyakit berjangkit. Ini memungkinkan tuan/puan dikenakan tindakan undang-undang di bawah Seksyen 15, Akta Pencegahan dan Pengawalan Penyakit Berjangkit 1988.`;
+    const p3Lines = doc.splitTextToSize(p3, 170);
+    doc.text(p3Lines, margin, y);
+    y += (p3Lines.length * 7) + 10;
+
+    // Penutup
+    doc.text("Sekian, terima kasih.", margin, y);
+    y += 15;
+
+    doc.setFont("helvetica", "bold");
+    doc.text("BERKHIDMAT UNTUK NEGARA", margin, y);
+    y += 15;
+
+    // Tandatangan & Butiran Pegawai
+    doc.setFont("helvetica", "normal");
+    doc.text("Saya yang menurut perintah,", margin, y);
+    y += 30; // Ruang kosong untuk tandatangan
+
+    doc.text(".......................................................................", margin, y);
+    y += 7;
+    doc.setFont("helvetica", "bold");
+    doc.text("Penolong Pegawai Kesihatan Persekitaran,", margin, y);
+    y += 7;
+    doc.text("Unit Tibi/Kusta,", margin, y);
+    y += 7;
+    doc.text("Pejabat Kesihatan Daerah Kulai.", margin, y);
+
+    y += 10;
+    doc.setFont("helvetica", "normal");
+    doc.text("No. Telefon: +60 12-747 8949", margin, y);
+    y += 7;
+
+    const today = new Date().toLocaleDateString('ms-MY');
+    doc.text(`Tarikh: ${today}`, margin, y);
+
+    // Muat Turun Fail
+    const filename = `Notis_TB_${kontak.nama.replace(/\s+/g, '_')}.pdf`;
+    doc.save(filename);
+  };
+  // ==========================================
+
   const openModal = (kes) => { setSelectedCase(kes); setShowModal(true); };
   const closeModal = () => { setShowModal(false); setSelectedCase(null); setContactForm({ nama: '', ic_no: '', no_tel: '', alamat: '', tarikh_saringan_1: '' }); };
   const handleContactChange = (e) => { setContactForm({ ...contactForm, [e.target.name]: e.target.value }); };
@@ -111,9 +182,13 @@ export default function ScreenPPKP() {
         no_tel: contactForm.no_tel, alamat: contactForm.alamat, tarikh_saringan_1: contactForm.tarikh_saringan_1,
         sms_status: 'Belum Dihantar'
     }]).select();
+    
     if (!error && data) {
       closeModal();
       handleSendSMS(data[0].id, data[0].no_tel, data[0].nama, data[0].tarikh_saringan_1, selectedCase.klinik, 1);
+      
+      // Auto-Jana PDF selepas daftar kontak
+      generateNotisPDF(data[0], selectedCase.klinik);
     }
     setLoadingContact(false);
   };
@@ -154,9 +229,6 @@ export default function ScreenPPKP() {
     XLSX.writeFile(workbook, "Laporan_TBCM_Kulai.xlsx");
   };
 
-  // ==========================================
-  // LOGIK KALENDAR YANG TELAH DIBETULKAN (SAFE DATE PARSING)
-  // ==========================================
   const formatSafeDate = (d) => {
     if (!d) return '';
     const yyyy = d.getFullYear();
@@ -190,7 +262,6 @@ export default function ScreenPPKP() {
     }
     return null;
   };
-  // ==========================================
 
   const isContactOutstanding = (c) => {
     for (let i = 1; i <= 4; i++) {
@@ -233,7 +304,7 @@ export default function ScreenPPKP() {
     return { color: '#10b981', fontWeight: 'bold' };
   };
 
-  const colors = { dark: '#1e293b', blue: '#007bff', cyan: '#17a2b8', green: '#28a745', yellow: '#ffc107', red: '#dc3545', grey: '#6c757d' };
+  const colors = { dark: '#1e293b', blue: '#007bff', cyan: '#17a2b8', green: '#28a745', yellow: '#ffc107', red: '#dc3545', grey: '#6c757d', purple: '#8b5cf6' };
   const s = {
     page: { padding: '20px', fontFamily: 'Arial, sans-serif', backgroundColor: '#f4f6f9', minHeight: '100vh' },
     topHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '3px solid #ddd', paddingBottom: '15px', marginBottom: '20px' },
@@ -373,9 +444,16 @@ export default function ScreenPPKP() {
                                   
                                   <button onClick={() => handleDeleteContact(c.id, c.nama)} style={{ position: 'absolute', top: '10px', right: '15px', color: colors.red, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '16px' }}>✕</button>
                                   
-                                  <div style={{ fontWeight: 'bold', marginBottom: '10px', fontSize: '15px' }}>
-                                    {c.nama} <span style={{fontWeight:'normal', fontSize:'12px', color:'#666'}}>({c.no_tel})</span>
-                                    <span style={{ marginLeft: '10px', fontSize: '11px', padding: '3px 8px', borderRadius: '12px', backgroundColor: '#e2e8f0', color: '#475569' }}>Status SMS Terkini: {c.sms_status || 'Belum Dihantar'}</span>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                                    <div>
+                                      <strong style={{ fontSize: '15px' }}>{c.nama}</strong> <span style={{fontWeight:'normal', fontSize:'12px', color:'#666'}}>({c.no_tel})</span>
+                                      <span style={{ marginLeft: '10px', fontSize: '11px', padding: '3px 8px', borderRadius: '12px', backgroundColor: '#e2e8f0', color: '#475569' }}>Status SMS: {c.sms_status || 'Belum Dihantar'}</span>
+                                    </div>
+                                    
+                                    {/* BUTANG JANA PDF UNTUK KONTAK INI */}
+                                    <button onClick={() => generateNotisPDF(c, kes.klinik)} style={{ padding: '6px 12px', backgroundColor: colors.purple, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>
+                                      📄 Cetak Notis PDF
+                                    </button>
                                   </div>
                                   
                                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
@@ -439,7 +517,7 @@ export default function ScreenPPKP() {
               <div style={s.formGroup}><label style={{ fontSize: '13px', fontWeight: 'bold' }}>No. Telefon</label><input type="text" name="no_tel" value={contactForm.no_tel} onChange={handleContactChange} required style={s.input}/></div>
               <div style={s.formGroup}><label style={{ fontSize: '13px', fontWeight: 'bold' }}>Alamat Rumah</label><textarea name="alamat" value={contactForm.alamat} onChange={handleContactChange} required style={{...s.input, minHeight: '60px'}}/></div>
               <div style={s.formGroup}><label style={{ fontSize: '13px', fontWeight: 'bold' }}>Tarikh Saringan 1 (Diberi)</label><input type="date" name="tarikh_saringan_1" value={contactForm.tarikh_saringan_1} onChange={handleContactChange} required style={s.input}/></div>
-              <button type="submit" disabled={loadingContact} style={{ width: '100%', padding: '10px', backgroundColor: colors.blue, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', marginTop: '10px' }}>{loadingContact ? 'Memproses...' : 'Simpan & Hantar SMS (S1)'}</button>
+              <button type="submit" disabled={loadingContact} style={{ width: '100%', padding: '10px', backgroundColor: colors.blue, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', marginTop: '10px' }}>{loadingContact ? 'Memproses...' : 'Simpan, Hantar SMS & Jana Notis (PDF)'}</button>
             </form>
           </div>
         </div>

@@ -2,19 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import * as XLSX from 'xlsx';
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'; // Tambahan untuk Carta Pai
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'; 
 
 export default function ScreenAdmin() {
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState('dashboard');
-  
   const [indexCases, setIndexCases] = useState([]);
   const [allContacts, setAllContacts] = useState([]);
   const [profiles, setProfiles] = useState([]);
-  
   const [currentUser, setCurrentUser] = useState(null);
-  
   const [filterKlinik, setFilterKlinik] = useState('Semua');
 
   useEffect(() => { checkAdminAccess(); }, []);
@@ -51,26 +48,72 @@ export default function ScreenAdmin() {
     else fetchAllData();
   };
 
+  // ==========================================
+  // --- PENAMBAHBAIKAN 1: EXPORT EXCEL TERPERINCI
+  // ==========================================
   const handleExportExcel = () => {
     const exportData = [];
+    
+    // Format Masa Lengkap (Tarikh & Masa Daftar)
+    const formatDateTime = (dateString) => {
+      if (!dateString) return '-';
+      return new Date(dateString).toLocaleString('ms-MY', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+    };
+    
+    // Format Tarikh Sahaja
+    const formatDateOnly = (dateString) => {
+      if (!dateString) return '-';
+      return new Date(dateString).toLocaleDateString('ms-MY', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    };
+
     let dataToExport = filterKlinik === 'Semua' ? indexCases : indexCases.filter(kes => kes.klinik === filterKlinik);
 
     dataToExport.forEach(kes => {
       const caseContacts = allContacts.filter(c => c.index_case_id === kes.id);
+      
+      const baseCaseData = {
+        'Tarikh & Masa Daftar': formatDateTime(kes.created_at),
+        'Tarikh Notifikasi': formatDateOnly(kes.tarikh_notifikasi),
+        'Tarikh Diagnosis': formatDateOnly(kes.tarikh_diagnosis),
+        'Klinik': kes.klinik,
+        'Status Kes': kes.is_finished ? 'Selesai' : 'Aktif',
+        'Kategori Indeks': kes.kategori,
+        'Nama Indeks': kes.nama,
+        'No K/P Indeks': kes.ic_no,
+      };
+
       if (caseContacts.length === 0) {
         exportData.push({
-          'Klinik': kes.klinik, 'Status Kes': kes.is_finished ? 'Selesai' : 'Aktif',
-          'Tarikh Diagnosis': kes.tarikh_diagnosis || '-', 'Nama Indeks': kes.nama, 'No K/P Indeks': kes.ic_no, 
-          'Nama Kontak': 'TIADA KONTAK', 'Status TB Kontak': '-', 'Outstanding': '-'
+          ...baseCaseData,
+          'Nama Kontak': 'TIADA KONTAK', 'No Tel Kontak': '-', 'Status TB Kontak': '-',
+          'Tarikh Diberi (S1)': '-', 'Tarikh Hadir (S1)': '-', 'IGRA (S1)': '-', 'Mantoux (S1)': '-', 'CXR (S1)': '-',
+          'Tarikh Diberi (S2)': '-', 'Tarikh Hadir (S2)': '-', 'IGRA (S2)': '-', 'Mantoux (S2)': '-', 'CXR (S2)': '-',
+          'Tarikh Diberi (S3)': '-', 'Tarikh Hadir (S3)': '-', 'IGRA (S3)': '-', 'Mantoux (S3)': '-', 'CXR (S3)': '-',
+          'Tarikh Diberi (S4)': '-', 'Tarikh Hadir (S4)': '-', 'IGRA (S4)': '-', 'Mantoux (S4)': '-', 'CXR (S4)': '-'
         });
       } else {
         caseContacts.forEach(kontak => {
           exportData.push({
-            'Klinik': kes.klinik, 'Status Kes': kes.is_finished ? 'Selesai' : 'Aktif',
-            'Tarikh Diagnosis': kes.tarikh_diagnosis || '-', 'Nama Indeks': kes.nama, 'No K/P Indeks': kes.ic_no, 
-            'Nama Kontak': kontak.nama, 'No Tel Kontak': kontak.no_tel, 'Status TB Kontak': kontak.status_tb,
-            'Sar 1 (Hadir)': kontak.tarikh_hadir_1 || 'BELUM', 'Sar 2 (Hadir)': kontak.tarikh_hadir_2 || 'BELUM',
-            'Sar 3 (Hadir)': kontak.tarikh_hadir_3 || 'BELUM', 'Sar 4 (Hadir)': kontak.tarikh_hadir_4 || 'BELUM',
+            ...baseCaseData,
+            'Nama Kontak': kontak.nama,
+            'No Tel Kontak': kontak.no_tel,
+            'Status TB Kontak': kontak.status_tb || 'Dalam Saringan',
+            
+            // Saringan 1
+            'Tarikh Diberi (S1)': formatDateOnly(kontak.tarikh_saringan_1), 'Tarikh Hadir (S1)': formatDateOnly(kontak.tarikh_hadir_1),
+            'IGRA (S1)': kontak.igra_1 || '-', 'Mantoux (S1)': kontak.mantoux_1 || '-', 'CXR (S1)': kontak.cxr_1 || '-',
+            
+            // Saringan 2
+            'Tarikh Diberi (S2)': formatDateOnly(kontak.tarikh_saringan_2), 'Tarikh Hadir (S2)': formatDateOnly(kontak.tarikh_hadir_2),
+            'IGRA (S2)': kontak.igra_2 || '-', 'Mantoux (S2)': kontak.mantoux_2 || '-', 'CXR (S2)': kontak.cxr_2 || '-',
+            
+            // Saringan 3
+            'Tarikh Diberi (S3)': formatDateOnly(kontak.tarikh_saringan_3), 'Tarikh Hadir (S3)': formatDateOnly(kontak.tarikh_hadir_3),
+            'IGRA (S3)': kontak.igra_3 || '-', 'Mantoux (S3)': kontak.mantoux_3 || '-', 'CXR (S3)': kontak.cxr_3 || '-',
+            
+            // Saringan 4
+            'Tarikh Diberi (S4)': formatDateOnly(kontak.tarikh_saringan_4), 'Tarikh Hadir (S4)': formatDateOnly(kontak.tarikh_hadir_4),
+            'IGRA (S4)': kontak.igra_4 || '-', 'Mantoux (S4)': kontak.mantoux_4 || '-', 'CXR (S4)': kontak.cxr_4 || '-'
           });
         });
       }
@@ -79,7 +122,7 @@ export default function ScreenAdmin() {
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Laporan_Induk_TBCM");
-    XLSX.writeFile(workbook, `Laporan_Induk_${filterKlinik.replace(/\s+/g, '_')}.xlsx`);
+    XLSX.writeFile(workbook, `Laporan_Lengkap_TBCM_${filterKlinik.replace(/\s+/g, '_')}.xlsx`);
   };
 
   // ==========================================
@@ -88,60 +131,69 @@ export default function ScreenAdmin() {
   const filteredCases = filterKlinik === 'Semua' ? indexCases : indexCases.filter(k => k.klinik === filterKlinik);
   const filteredContacts = allContacts.filter(c => filteredCases.some(kes => kes.id === c.index_case_id));
 
-  // 1. KPI Indeks & Pecahan
   const kpiIndeks = filteredCases.length;
   const indeksSP = filteredCases.filter(k => k.kategori === 'Smear Positif').length;
   const indeksSN = filteredCases.filter(k => k.kategori === 'Smear Negatif').length;
   const indeksEPTB = filteredCases.filter(k => k.kategori === 'ExtraPTB').length;
 
-  // 2. KPI Kontak & Pecahan
   const kpiKontak = filteredContacts.length;
-  const getKontakByIndeksCategory = (cat) => {
-    return filteredContacts.filter(c => {
-      const parentCase = filteredCases.find(k => k.id === c.index_case_id);
-      return parentCase && parentCase.kategori === cat;
-    }).length;
-  };
+  const getKontakByIndeksCategory = (cat) => filteredContacts.filter(c => filteredCases.find(k => k.id === c.index_case_id)?.kategori === cat).length;
+  
   const kontakSP = getKontakByIndeksCategory('Smear Positif');
   const kontakSN = getKontakByIndeksCategory('Smear Negatif');
   const kontakEPTB = getKontakByIndeksCategory('ExtraPTB');
 
-  // 3. Nisbah Indeks:Kontak
   const calcRatio = (indeks, kontak) => indeks > 0 ? `1 : ${(kontak / indeks).toFixed(1)}` : '0 : 0';
   const ratioAll = calcRatio(kpiIndeks, kpiKontak);
   const ratioSP = calcRatio(indeksSP, kontakSP);
 
-  // 4. Peratusan Saringan
   const calcPercent = (saringanNum) => {
     if (kpiKontak === 0) return '0%';
     const attended = filteredContacts.filter(c => c[`tarikh_hadir_${saringanNum}`]).length;
     return `${((attended / kpiKontak) * 100).toFixed(1)}%`;
   };
 
-  // 5. Data Pie Chart
+  // ==========================================
+  // --- PENAMBAHBAIKAN 2: KPI < 14 HARI
+  // ==========================================
+  const calc14DaysKPI = (n) => {
+    const within14DaysCount = filteredContacts.filter(c => {
+      const scheduled = c[`tarikh_saringan_${n}`];
+      const attended = c[`tarikh_hadir_${n}`];
+      if (!scheduled || !attended) return false;
+      
+      const diffTime = new Date(attended) - new Date(scheduled);
+      const diffDays = diffTime / (1000 * 60 * 60 * 24);
+      return diffDays <= 14; // Hadir awal atau maksimum lambat 14 hari
+    }).length;
+
+    const percentage = kpiKontak === 0 ? '0%' : `${((within14DaysCount / kpiKontak) * 100).toFixed(1)}%`;
+    return { count: within14DaysCount, percent: percentage };
+  };
+
+  // Data Pie Chart
   const countTBI = filteredContacts.filter(c => c.status_tb === 'TBI').length;
   const countAktif = filteredContacts.filter(c => c.status_tb === 'Aktif TB').length;
   const countTiada = filteredContacts.filter(c => c.status_tb === 'Tiada TB').length;
   const countSaringan = filteredContacts.filter(c => c.status_tb === 'Dalam Saringan' || !c.status_tb).length;
 
   const pieData = [
-    { name: 'TBI', value: countTBI, color: '#f97316' }, // Oren
-    { name: 'Aktif TB', value: countAktif, color: '#ef4444' }, // Merah
-    { name: 'Tiada TB', value: countTiada, color: '#10b981' }, // Hijau
-    { name: 'Dalam Saringan', value: countSaringan, color: '#94a3b8' } // Kelabu
+    { name: 'TBI', value: countTBI, color: '#f97316' },
+    { name: 'Aktif TB', value: countAktif, color: '#ef4444' },
+    { name: 'Tiada TB', value: countTiada, color: '#10b981' },
+    { name: 'Dalam Saringan', value: countSaringan, color: '#94a3b8' }
   ];
 
-  // Visual Styles 
   const colors = { dark: '#1e293b', blue: '#007bff', cyan: '#17a2b8', green: '#28a745', yellow: '#ffc107', red: '#dc3545', grey: '#6c757d' };
   const s = {
     page: { padding: '20px', fontFamily: 'Arial, sans-serif', backgroundColor: '#f4f6f9', minHeight: '100vh' },
     topHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '3px solid #ddd', paddingBottom: '15px', marginBottom: '20px' },
     tabContainer: { display: 'flex', gap: '10px', marginBottom: '20px' },
     tabBtn: (isActive) => ({ padding: '10px 20px', fontSize: '15px', fontWeight: 'bold', border: 'none', borderRadius: '4px', cursor: 'pointer', backgroundColor: isActive ? colors.blue : '#e2e3e5', color: isActive ? '#fff' : '#333' }),
-    kpiRow: { display: 'flex', gap: '15px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'stretch' },
-    kpiCard: (color) => ({ flex: 1, minWidth: '220px', backgroundColor: '#fff', padding: '20px', borderRadius: '8px', border: `1px solid ${color}`, borderTop: `5px solid ${color}`, boxShadow: '0 2px 4px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column' }),
+    kpiRow: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '15px', marginBottom: '20px', alignItems: 'stretch' },
+    kpiCard: (color) => ({ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', border: `1px solid ${color}`, borderTop: `5px solid ${color}`, boxShadow: '0 2px 4px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column' }),
     kpiValue: { fontSize: '32px', margin: '0 0 10px 0', color: colors.dark },
-    kpiTitle: { fontSize: '15px', fontWeight: 'bold', margin: '0 0 15px 0', color: colors.dark, borderBottom: '1px solid #eee', paddingBottom: '5px' },
+    kpiTitle: { fontSize: '14px', fontWeight: 'bold', margin: '0 0 15px 0', color: colors.dark, borderBottom: '1px solid #eee', paddingBottom: '5px' },
     kpiSubText: { fontSize: '12px', color: '#555', margin: '3px 0', display: 'flex', justifyContent: 'space-between' },
     cardFull: { backgroundColor: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #ddd', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' },
     table: { width: '100%', borderCollapse: 'collapse', fontSize: '14px' },
@@ -165,9 +217,6 @@ export default function ScreenAdmin() {
         <button style={s.tabBtn(activeTab === 'users')} onClick={() => setActiveTab('users')}>👥 Pengurusan Akaun Staf</button>
       </div>
 
-      {/* =========================================
-          TAB 1: PAPAN PEMUKA INDUK (DASHBOARD)
-          ========================================= */}
       {activeTab === 'dashboard' && (
         <>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
@@ -182,9 +231,7 @@ export default function ScreenAdmin() {
             </div>
           </div>
 
-          {/* BARIS KPI 1: INDEKS, KONTAK, NISBAH */}
           <div style={s.kpiRow}>
-            {/* JUMLAH INDEKS */}
             <div style={s.kpiCard(colors.blue)}>
               <h4 style={s.kpiTitle}>Jumlah Kes Indeks</h4>
               <h2 style={s.kpiValue}>{kpiIndeks}</h2>
@@ -195,43 +242,48 @@ export default function ScreenAdmin() {
               </div>
             </div>
 
-            {/* JUMLAH KONTAK */}
             <div style={s.kpiCard(colors.cyan)}>
               <h4 style={s.kpiTitle}>Jumlah Kontak</h4>
               <h2 style={s.kpiValue}>{kpiKontak}</h2>
               <div style={{ marginTop: 'auto' }}>
-                <div style={s.kpiSubText}><span>Dari Indeks Smear Positif:</span> <strong>{kontakSP}</strong></div>
-                <div style={s.kpiSubText}><span>Dari Indeks Smear Negatif:</span> <strong>{kontakSN}</strong></div>
-                <div style={s.kpiSubText}><span>Dari Indeks Extra PTB:</span> <strong>{kontakEPTB}</strong></div>
+                <div style={s.kpiSubText}><span>Drpd Indeks SP:</span> <strong>{kontakSP}</strong></div>
+                <div style={s.kpiSubText}><span>Drpd Indeks SN:</span> <strong>{kontakSN}</strong></div>
+                <div style={s.kpiSubText}><span>Drpd Indeks EPTB:</span> <strong>{kontakEPTB}</strong></div>
               </div>
             </div>
 
-            {/* NISBAH INDEKS:KONTAK */}
             <div style={s.kpiCard(colors.dark)}>
               <h4 style={s.kpiTitle}>Nisbah Indeks : Kontak</h4>
               <h2 style={s.kpiValue}>{ratioAll}</h2>
               <div style={{ marginTop: 'auto' }}>
                 <div style={s.kpiSubText}><span>Nisbah Keseluruhan:</span> <strong>{ratioAll}</strong></div>
-                <div style={s.kpiSubText}><span>Nisbah (Smear Positif Sahaja):</span> <strong>{ratioSP}</strong></div>
+                <div style={s.kpiSubText}><span>Nisbah (Smear Positif):</span> <strong>{ratioSP}</strong></div>
               </div>
             </div>
 
-            {/* PERATUSAN SARINGAN */}
             <div style={s.kpiCard(colors.green)}>
-              <h4 style={s.kpiTitle}>Peratus Kontak Disaring</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '5px' }}>
-                <div style={s.kpiSubText}><span>Saringan Pertama:</span> <strong>{calcPercent(1)}</strong></div>
-                <div style={s.kpiSubText}><span>Saringan Kedua:</span> <strong>{calcPercent(2)}</strong></div>
-                <div style={s.kpiSubText}><span>Saringan Ketiga:</span> <strong>{calcPercent(3)}</strong></div>
-                <div style={s.kpiSubText}><span>Saringan Keempat:</span> <strong>{calcPercent(4)}</strong></div>
+              <h4 style={s.kpiTitle}>Peratus Hadir Keseluruhan</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: 'auto' }}>
+                <div style={s.kpiSubText}><span>Saringan 1:</span> <strong>{calcPercent(1)}</strong></div>
+                <div style={s.kpiSubText}><span>Saringan 2:</span> <strong>{calcPercent(2)}</strong></div>
+                <div style={s.kpiSubText}><span>Saringan 3:</span> <strong>{calcPercent(3)}</strong></div>
+                <div style={s.kpiSubText}><span>Saringan 4:</span> <strong>{calcPercent(4)}</strong></div>
+              </div>
+            </div>
+
+            {/* KAD KPI BAHARU: HADIR < 14 HARI */}
+            <div style={s.kpiCard(colors.yellow)}>
+              <h4 style={s.kpiTitle}>Kepatuhan Hadir (&le; 14 Hari)</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: 'auto' }}>
+                <div style={s.kpiSubText}><span>Saringan 1:</span> <strong>{calc14DaysKPI(1).count} kes ({calc14DaysKPI(1).percent})</strong></div>
+                <div style={s.kpiSubText}><span>Saringan 2:</span> <strong>{calc14DaysKPI(2).count} kes ({calc14DaysKPI(2).percent})</strong></div>
+                <div style={s.kpiSubText}><span>Saringan 3:</span> <strong>{calc14DaysKPI(3).count} kes ({calc14DaysKPI(3).percent})</strong></div>
+                <div style={s.kpiSubText}><span>Saringan 4:</span> <strong>{calc14DaysKPI(4).count} kes ({calc14DaysKPI(4).percent})</strong></div>
               </div>
             </div>
           </div>
 
-          {/* BARIS KPI 2: PIE CHART & JADUAL RINGKAS */}
           <div style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>
-            
-            {/* PIE CHART STATUS PENYAKIT */}
             <div style={{ flex: 1, backgroundColor: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #ddd', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
               <h3 style={{ margin: '0 0 15px 0', textAlign: 'center' }}>Taburan Status Penyakit Kontak</h3>
               {kpiKontak === 0 ? (
@@ -253,7 +305,6 @@ export default function ScreenAdmin() {
               )}
             </div>
 
-            {/* JADUAL RINGKASAN INDEKS */}
             <div style={{ flex: 2, backgroundColor: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #ddd', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', overflowY: 'auto', maxHeight: '350px' }}>
               <h3 style={{ marginTop: 0 }}>Ringkasan Status Kes Indeks</h3>
               <table style={s.table}>
@@ -291,9 +342,6 @@ export default function ScreenAdmin() {
         </>
       )}
 
-      {/* =========================================
-          TAB 2: PENGURUSAN AKAUN STAF (PROFILES)
-          ========================================= */}
       {activeTab === 'users' && (
         <div style={s.cardFull}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
