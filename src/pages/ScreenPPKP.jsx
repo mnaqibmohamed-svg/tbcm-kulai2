@@ -16,8 +16,12 @@ export default function ScreenPPKP() {
   const [loading, useStateLoading] = useState(false);
   const [indexCases, setIndexCases] = useState([]);
   const [allContacts, setAllContacts] = useState([]); 
-  const [expandedCaseId, setExpandedCaseId] = useState(null); 
   
+  // State untuk Sync Kalendar PR1
+  const [customAppts, setCustomAppts] = useState([]);
+  const [holidays, setHolidays] = useState([]);
+
+  const [expandedCaseId, setExpandedCaseId] = useState(null); 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterKlinik, setFilterKlinik] = useState('Semua');
   const [filterOutstanding, setFilterOutstanding] = useState(false);
@@ -26,10 +30,8 @@ export default function ScreenPPKP() {
   const [showModal, setShowModal] = useState(false);
   const [selectedCase, setSelectedCase] = useState(null); 
   
-  // State untuk Muat Naik Pukal (Bulk Upload)
-  const [contactUploadMode, setContactUploadMode] = useState('manual'); // 'manual' | 'excel'
+  const [contactUploadMode, setContactUploadMode] = useState('manual'); 
   const [bulkContacts, setBulkContacts] = useState([]);
-  
   const [contactForm, setContactForm] = useState({
     nama: '', ic_no: '', no_tel: '', alamat: '', tarikh_saringan_1: '', pegawai_notis: 'Maziah'
   });
@@ -41,10 +43,17 @@ export default function ScreenPPKP() {
   useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
-    const { data: casesData } = await supabase.from('index_cases').select('*').order('created_at', { ascending: false });
-    const { data: contactsData } = await supabase.from('contacts').select('*').order('created_at', { ascending: true });
-    if (casesData) setIndexCases(casesData);
-    if (contactsData) setAllContacts(contactsData);
+    const [casesRes, contactsRes, apptRes, holRes] = await Promise.all([
+      supabase.from('index_cases').select('*').order('created_at', { ascending: false }),
+      supabase.from('contacts').select('*').order('created_at', { ascending: true }),
+      supabase.from('custom_appointments').select('*'),
+      supabase.from('holidays').select('*')
+    ]);
+
+    if (casesRes.data) setIndexCases(casesRes.data);
+    if (contactsRes.data) setAllContacts(contactsRes.data);
+    if (apptRes.data) setCustomAppts(apptRes.data);
+    if (holRes.data) setHolidays(holRes.data);
   };
 
   const handleLogout = async () => { await supabase.auth.signOut(); navigate('/'); };
@@ -84,7 +93,7 @@ export default function ScreenPPKP() {
       fetchData();
       
       const mesej = `PKD Kulai: Salam En/Pn ${namaKontak}. Anda mempunyai temujanji Saringan TB di ${klinik} pada ${tarikhSaringan}. Sila hadir mengikut jadual.`;
-      const apiKey = 'fea7875864e5a9e124b1080109b5dd8b'; 
+      const apiKey = 'TAMPAL_API_KEY_ANDA_DI_SINI'; 
       
       let formatTel = noTel.replace(/[^0-9]/g, ''); 
       if (formatTel.startsWith('0')) formatTel = '6' + formatTel; 
@@ -146,12 +155,13 @@ export default function ScreenPPKP() {
       return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
     };
 
-    // 1. KEMASKINI PERENGGAN 1 & 2 (MENGANDUNGI "UNIT TIBI" DAN MASA "8.30 PAGI")
+    const s1TarikhGuna = kontak.tarikh_saringan_1_baru || kontak.tarikh_saringan_1;
+
     const p1 = `Adalah dimaklumkan bahawa penyiasatan pihak kami mendapati Tuan/Puan bernama ${kontak.nama} mempunyai kaitan rapat dengan pesakit Tibi ${kes.nama} yang boleh menyebabkan Tuan/Puan atau individu/mereka yang di bawah jagaan Tuan/Puan turut mendapat jangkitan Tibi.`;
     doc.text(p1, margin, y, { maxWidth: 170, align: "justify" });
     y += (doc.splitTextToSize(p1, 170).length * 6) + 5;
 
-    const p2 = `2. Oleh yang demikian, Tuan/Puan dan/atau individu/mereka yang di bawah jagaan Tuan/Puan diarah untuk menghadirkan diri ke Unit Tibi ${kes.klinik} pada waktu pejabat pada ${formatTarikhDiberi(kontak.tarikh_saringan_1)} pukul 8.30 pagi bagi menjalani pemeriksaan saringan dan pengesahan penyakit Tibi.`;
+    const p2 = `2. Oleh yang demikian, Tuan/Puan dan/atau individu/mereka yang di bawah jagaan Tuan/Puan diarah untuk menghadirkan diri ke Unit Tibi ${kes.klinik} pada waktu pejabat pada ${formatTarikhDiberi(s1TarikhGuna)} pukul 8.30 pagi bagi menjalani pemeriksaan saringan dan pengesahan penyakit Tibi.`;
     doc.text(p2, margin, y, { maxWidth: 170, align: "justify" });
     y += (doc.splitTextToSize(p2, 170).length * 6) + 5;
 
@@ -224,9 +234,6 @@ export default function ScreenPPKP() {
 
   const handleContactChange = (e) => { setContactForm({ ...contactForm, [e.target.name]: e.target.value }); };
 
-  // ==========================================
-  // FUNGSI MUAT NAIK EXCEL PUKAL (BULK UPLOAD)
-  // ==========================================
   const downloadExcelTemplate = () => {
     const ws = XLSX.utils.json_to_sheet([{
       'Nama Penuh Kontak': 'Ahmad bin Abu',
@@ -234,7 +241,7 @@ export default function ScreenPPKP() {
       'No Telefon': '0123456789',
       'Alamat Rumah': 'No 1, Jalan Raya',
       'Daerah/Negeri': 'Kulai, Johor',
-      'Tarikh Saringan 1 Diberi': '2026-03-25' // Format YYYY-MM-DD
+      'Tarikh Saringan 1 Diberi': '2026-03-25' 
     }]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Template_Kontak");
@@ -275,7 +282,6 @@ export default function ScreenPPKP() {
     setBulkContacts(newBulk);
   };
 
-  // Submit Manual
   const handleContactSubmit = async (e) => {
     e.preventDefault();
     setLoadingContact(true);
@@ -293,13 +299,12 @@ export default function ScreenPPKP() {
     setLoadingContact(false);
   };
 
-  // Submit Excel
   const handleBulkSubmit = async () => {
     setLoadingContact(true);
     for (const c of bulkContacts) {
       if (!c.selectedToSave) continue;
       
-      const fullAlamat = `${c.alamat}, ${c.daerah_negeri}`; // Gabung alamat & daerah/negeri
+      const fullAlamat = `${c.alamat}, ${c.daerah_negeri}`; 
       
       const { data, error } = await supabase.from('contacts').insert([{
         index_case_id: selectedCase.id,
@@ -330,36 +335,70 @@ export default function ScreenPPKP() {
 
   const handleExportExcel = () => {
     const exportData = [];
+    
+    // Format Masa Lengkap (Tarikh & Masa Daftar)
     const formatDateTime = (dateString) => {
       if (!dateString) return '-';
-      return new Date(dateString).toLocaleString('ms-MY', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      return new Date(dateString).toLocaleString('ms-MY', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
     };
-    indexCases.forEach(kes => {
+    
+    // Format Tarikh Sahaja
+    const formatDateOnly = (dateString) => {
+      if (!dateString) return '-';
+      return new Date(dateString).toLocaleDateString('ms-MY', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    };
+
+    let dataToExport = filterKlinik === 'Semua' ? indexCases : indexCases.filter(kes => kes.klinik === filterKlinik);
+
+    dataToExport.forEach(kes => {
       const caseContacts = allContacts.filter(c => c.index_case_id === kes.id);
+      
+      const baseCaseData = {
+        'Tarikh & Masa Daftar': formatDateTime(kes.created_at),
+        'No Daftar Tibi': kes.no_daftar_tibi || '-',
+        'Klinik': kes.klinik,
+        'Kategori Indeks': kes.kategori,
+        'Nama Indeks': kes.nama,
+        'No K/P Indeks': kes.ic_no,
+        'No Tel Indeks': kes.no_tel || '-',
+        'Alamat Indeks': kes.alamat || '-',
+        'Tarikh Notifikasi': formatDateOnly(kes.tarikh_notifikasi),
+        'Tarikh Diagnosis': formatDateOnly(kes.tarikh_diagnosis),
+        'Status Kes': kes.is_finished ? 'Selesai' : 'Pemantauan',
+      };
+
       if (caseContacts.length === 0) {
         exportData.push({
-          'Tarikh Didaftar': formatDateTime(kes.created_at), 'No Daftar Tibi': kes.no_daftar_tibi, 'Klinik': kes.klinik, 'Kategori Indeks': kes.kategori,
-          'Nama Indeks': kes.nama, 'No K/P Indeks': kes.ic_no, 'Nama Kontak': 'TIADA KONTAK', 'No Tel': '-',
-          'Sar. 1 (Diberi)': '-', 'Hadir Sar. 1': '-', 'Sar. 2 (Diberi)': '-', 'Hadir Sar. 2': '-',
-          'Sar. 3 (Diberi)': '-', 'Hadir Sar. 3': '-', 'Sar. 4 (Diberi)': '-', 'Hadir Sar. 4': '-',
+          ...baseCaseData,
+          'Nama Kontak': 'TIADA KONTAK', 'No K/P Kontak': '-', 'No Tel Kontak': '-', 'Alamat Kontak': '-', 'Status TB Kontak': '-',
+          'Tarikh S1 (Asal)': '-', 'Tarikh S1 (Baru)': '-', 'Tarikh Hadir S1': '-', 'IGRA S1': '-', 'Mantoux S1': '-', 'CXR S1': '-',
+          'Tarikh S2 (Asal)': '-', 'Tarikh S2 (Baru)': '-', 'Tarikh Hadir S2': '-', 'IGRA S2': '-', 'Mantoux S2': '-', 'CXR S2': '-',
+          'Tarikh S3 (Asal)': '-', 'Tarikh S3 (Baru)': '-', 'Tarikh Hadir S3': '-', 'IGRA S3': '-', 'Mantoux S3': '-', 'CXR S3': '-',
+          'Tarikh S4 (Asal)': '-', 'Tarikh S4 (Baru)': '-', 'Tarikh Hadir S4': '-', 'IGRA S4': '-', 'Mantoux S4': '-', 'CXR S4': '-'
         });
       } else {
         caseContacts.forEach(kontak => {
           exportData.push({
-            'Tarikh Didaftar': formatDateTime(kes.created_at), 'No Daftar Tibi': kes.no_daftar_tibi, 'Klinik': kes.klinik, 'Kategori Indeks': kes.kategori,
-            'Nama Indeks': kes.nama, 'No K/P Indeks': kes.ic_no, 'Nama Kontak': kontak.nama, 'No Tel': kontak.no_tel,
-            'Sar. 1 (Diberi)': kontak.tarikh_saringan_1 || '-', 'Hadir Sar. 1': kontak.tarikh_hadir_1 || 'BELUM',
-            'Sar. 2 (Diberi)': kontak.tarikh_saringan_2 || '-', 'Hadir Sar. 2': kontak.tarikh_hadir_2 || 'BELUM',
-            'Sar. 3 (Diberi)': kontak.tarikh_saringan_3 || '-', 'Hadir Sar. 3': kontak.tarikh_hadir_3 || 'BELUM',
-            'Sar. 4 (Diberi)': kontak.tarikh_saringan_4 || '-', 'Hadir Sar. 4': kontak.tarikh_hadir_4 || 'BELUM',
+            ...baseCaseData,
+            'Nama Kontak': kontak.nama,
+            'No K/P Kontak': kontak.ic_no || '-',
+            'No Tel Kontak': kontak.no_tel || '-',
+            'Alamat Kontak': kontak.alamat || '-',
+            'Status TB Kontak': kontak.status_tb || 'Dalam Saringan',
+            
+            'Tarikh S1 (Asal)': formatDateOnly(kontak.tarikh_saringan_1), 'Tarikh S1 (Baru)': formatDateOnly(kontak.tarikh_saringan_1_baru), 'Tarikh Hadir S1': formatDateOnly(kontak.tarikh_hadir_1), 'IGRA S1': kontak.igra_1 || '-', 'Mantoux S1': kontak.mantoux_1 || '-', 'CXR S1': kontak.cxr_1 || '-',
+            'Tarikh S2 (Asal)': formatDateOnly(kontak.tarikh_saringan_2), 'Tarikh S2 (Baru)': formatDateOnly(kontak.tarikh_saringan_2_baru), 'Tarikh Hadir S2': formatDateOnly(kontak.tarikh_hadir_2), 'IGRA S2': kontak.igra_2 || '-', 'Mantoux S2': kontak.mantoux_2 || '-', 'CXR S2': kontak.cxr_2 || '-',
+            'Tarikh S3 (Asal)': formatDateOnly(kontak.tarikh_saringan_3), 'Tarikh S3 (Baru)': formatDateOnly(kontak.tarikh_saringan_3_baru), 'Tarikh Hadir S3': formatDateOnly(kontak.tarikh_hadir_3), 'IGRA S3': kontak.igra_3 || '-', 'Mantoux S3': kontak.mantoux_3 || '-', 'CXR S3': kontak.cxr_3 || '-',
+            'Tarikh S4 (Asal)': formatDateOnly(kontak.tarikh_saringan_4), 'Tarikh S4 (Baru)': formatDateOnly(kontak.tarikh_saringan_4_baru), 'Tarikh Hadir S4': formatDateOnly(kontak.tarikh_hadir_4), 'IGRA S4': kontak.igra_4 || '-', 'Mantoux S4': kontak.mantoux_4 || '-', 'CXR S4': kontak.cxr_4 || '-'
           });
         });
       }
     });
+
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Data_Kes_dan_Kontak");
-    XLSX.writeFile(workbook, "Laporan_TBCM_Kulai.xlsx");
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Laporan_TBCM");
+    XLSX.writeFile(workbook, `Laporan_Lengkap_TBCM_${filterKlinik.replace(/\s+/g, '_')}.xlsx`);
   };
 
   const formatSafeDate = (d) => {
@@ -372,33 +411,52 @@ export default function ScreenPPKP() {
 
   const todayStr = formatSafeDate(new Date());
   
+  // --- LOGIK KALENDAR YANG TELAH DI SYNC ---
   const selectedDateStr = formatSafeDate(selectedDate);
+  const isHoliday = holidays.find(h => h.tarikh === selectedDateStr);
+
   const appointmentsOnSelectedDate = allContacts.filter(c => 
-    c.tarikh_saringan_1 === selectedDateStr || 
-    c.tarikh_saringan_2 === selectedDateStr || 
-    c.tarikh_saringan_3 === selectedDateStr || 
-    c.tarikh_saringan_4 === selectedDateStr
+    (c.tarikh_saringan_1_baru || c.tarikh_saringan_1) === selectedDateStr || 
+    (c.tarikh_saringan_2_baru || c.tarikh_saringan_2) === selectedDateStr || 
+    (c.tarikh_saringan_3_baru || c.tarikh_saringan_3) === selectedDateStr || 
+    (c.tarikh_saringan_4_baru || c.tarikh_saringan_4) === selectedDateStr
   );
+
+  const customApptsOnSelected = customAppts.filter(a => a.tarikh === selectedDateStr && (filterKlinik === 'Semua' || a.klinik === filterKlinik));
 
   const tileContent = ({ date, view }) => {
     if (view === 'month') {
       const dateStr = formatSafeDate(date);
-      const adaTemujanji = allContacts.some(c => 
-        c.tarikh_saringan_1 === dateStr || 
-        c.tarikh_saringan_2 === dateStr || 
-        c.tarikh_saringan_3 === dateStr || 
-        c.tarikh_saringan_4 === dateStr
+      const hol = holidays.some(h => h.tarikh === dateStr);
+      const adaKontak = allContacts.some(c => 
+        (c.tarikh_saringan_1_baru || c.tarikh_saringan_1) === dateStr || 
+        (c.tarikh_saringan_2_baru || c.tarikh_saringan_2) === dateStr || 
+        (c.tarikh_saringan_3_baru || c.tarikh_saringan_3) === dateStr || 
+        (c.tarikh_saringan_4_baru || c.tarikh_saringan_4) === dateStr
       );
-      if (adaTemujanji) {
-        return <div style={{ height: '6px', width: '6px', backgroundColor: 'red', borderRadius: '50%', margin: 'auto', marginTop: '2px' }}></div>;
-      }
+      const adaCustom = customAppts.some(a => a.tarikh === dateStr);
+
+      return (
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '2px', marginTop: '2px' }}>
+          {hol && <div style={{ height: '6px', width: '6px', backgroundColor: '#ef4444', borderRadius: '50%' }}></div>}
+          {!hol && adaKontak && <div style={{ height: '6px', width: '6px', backgroundColor: '#f97316', borderRadius: '50%' }}></div>}
+          {!hol && adaCustom && <div style={{ height: '6px', width: '6px', backgroundColor: '#3b82f6', borderRadius: '50%' }}></div>}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const tileClassName = ({ date, view }) => {
+    if (view === 'month' && holidays.some(h => h.tarikh === formatSafeDate(date))) {
+      return 'holiday-tile';
     }
     return null;
   };
 
   const isContactOutstanding = (c) => {
     for (let i = 1; i <= 4; i++) {
-      const sDate = c[`tarikh_saringan_${i}`];
+      const sDate = c[`tarikh_saringan_${i}_baru`] || c[`tarikh_saringan_${i}`];
       const hDate = c[`tarikh_hadir_${i}`];
       if (sDate && sDate <= todayStr && !hDate) return true;
     }
@@ -437,7 +495,7 @@ export default function ScreenPPKP() {
     return { color: '#10b981', fontWeight: 'bold' };
   };
 
-  const colors = { dark: '#1e293b', blue: '#007bff', cyan: '#17a2b8', green: '#28a745', yellow: '#ffc107', red: '#dc3545', grey: '#6c757d', purple: '#8b5cf6', pink: '#ec4899' };
+  const colors = { dark: '#1e293b', blue: '#007bff', cyan: '#17a2b8', green: '#28a745', yellow: '#ffc107', red: '#dc3545', grey: '#6c757d', purple: '#8b5cf6', pink: '#ec4899', orange: '#f97316' };
   const s = {
     page: { padding: '20px', fontFamily: 'Arial, sans-serif', backgroundColor: '#f4f6f9', minHeight: '100vh' },
     topHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '3px solid #ddd', paddingBottom: '15px', marginBottom: '20px' },
@@ -460,7 +518,10 @@ export default function ScreenPPKP() {
 
   return (
     <div style={s.page}>
-      <style>{`@keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }`}</style>
+      <style>{`
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+        .holiday-tile { background-color: #fee2e2 !important; border-radius: 4px; color: #ef4444 !important; font-weight: bold; }
+      `}</style>
       
       <div style={s.topHeader}>
         <div>
@@ -497,7 +558,6 @@ export default function ScreenPPKP() {
       </div>
 
       <div style={s.mainLayout}>
-        {/* BORANG TAMBAH INDEKS */}
         <div style={s.cardLeft}>
           <h3 style={{ marginTop: 0, borderBottom: '1px solid #ddd', paddingBottom: '10px' }}>+ Daftar Kes Indeks</h3>
           <form onSubmit={handleSubmit}>
@@ -524,7 +584,7 @@ export default function ScreenPPKP() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap', gap: '10px' }}>
             <h3 style={{ margin: 0 }}>Senarai Kes Indeks & Kontak</h3>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-              <button onClick={() => setShowCalendar(true)} style={{ padding: '8px 12px', backgroundColor: colors.cyan, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>📅 Kalendar</button>
+              <button onClick={() => setShowCalendar(true)} style={{ padding: '8px 12px', backgroundColor: colors.cyan, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>📅 Kalendar (Sync)</button>
               <button onClick={handleExportExcel} style={{ padding: '8px 12px', backgroundColor: colors.green, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>📥 Excel</button>
               <input type="text" placeholder="Cari Nama/KP..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }} />
               <select value={filterKlinik} onChange={(e) => setFilterKlinik(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}><option value="Semua">Semua Klinik</option><option value="KK Kulai">KK Kulai</option><option value="KK Kulai Besar">KK Kulai Besar</option></select>
@@ -597,19 +657,33 @@ export default function ScreenPPKP() {
                                   </div>
                                   
                                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
-                                    {[1, 2, 3, 4].map(n => (
-                                      <div key={n} style={{ fontSize: '12px', padding: '10px', backgroundColor: '#f4f6f9', borderRadius: '6px', border: '1px solid #eee' }}>
-                                        <div style={{ marginBottom: '5px' }}><strong>S{n}:</strong> {c[`tarikh_saringan_${n}`] || '-'}</div>
-                                        <div style={{ marginBottom: '8px' }}><strong>Hadir:</strong> <span style={{ color: c[`tarikh_hadir_${n}`] ? colors.green : colors.red, fontWeight: 'bold' }}>{c[`tarikh_hadir_${n}`] || 'Belum'}</span></div>
-                                        
-                                        {c[`tarikh_saringan_${n}`] && !c[`tarikh_hadir_${n}`] && (
-                                          <button onClick={() => handleSendSMS(c.id, c.no_tel, c.nama, c[`tarikh_saringan_${n}`], kes.klinik, n)} 
-                                            style={{ width: '100%', padding: '5px', backgroundColor: '#e2e8f0', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold', color: '#334155' }}>
-                                            ✉️ Hantar Notis S{n}
-                                          </button>
-                                        )}
-                                      </div>
-                                    ))}
+                                    {[1, 2, 3, 4].map(n => {
+                                      const tarikhAsal = c[`tarikh_saringan_${n}`];
+                                      const tarikhBaru = c[`tarikh_saringan_${n}_baru`];
+                                      const tarikhGuna = tarikhBaru || tarikhAsal;
+
+                                      return (
+                                        <div key={n} style={{ fontSize: '12px', padding: '10px', backgroundColor: '#f4f6f9', borderRadius: '6px', border: '1px solid #eee' }}>
+                                          <div style={{ marginBottom: '5px' }}>
+                                            <strong>S{n}:</strong> <br/>
+                                            {tarikhBaru ? (
+                                              <>
+                                                <del style={{color:'#999'}}>{tarikhAsal}</del><br/>
+                                                <span style={{color: colors.red, fontWeight:'bold'}}>{tarikhBaru} (Ganti)</span>
+                                              </>
+                                            ) : ( tarikhAsal || '-' )}
+                                          </div>
+                                          <div style={{ marginBottom: '8px' }}><strong>Hadir:</strong> <span style={{ color: c[`tarikh_hadir_${n}`] ? colors.green : colors.red, fontWeight: 'bold' }}>{c[`tarikh_hadir_${n}`] || 'Belum'}</span></div>
+                                          
+                                          {tarikhGuna && !c[`tarikh_hadir_${n}`] && (
+                                            <button onClick={() => handleSendSMS(c.id, c.no_tel, c.nama, tarikhGuna, kes.klinik, n)} 
+                                              style={{ width: '100%', padding: '5px', backgroundColor: '#e2e8f0', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold', color: '#334155' }}>
+                                              ✉️ Hantar Notis S{n}
+                                            </button>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
                                   </div>
 
                                 </div>
@@ -627,41 +701,60 @@ export default function ScreenPPKP() {
         </div>
       </div>
 
+      {/* KALENDAR SYNC (MENAMPILKAN REKOD PR1 & CUTI UMUM) */}
       {showCalendar && (
         <div style={s.modalOverlay}>
-          {/* Tambah maxHeight, display flex dan column supaya ia tak lebih dari skrin */}
-          <div style={{...s.modalContent, maxHeight: '90vh', display: 'flex', flexDirection: 'column', width: '450px'}}>
-            
-            {/* Butang pangkah statik */}
+          <div style={{...s.modalContent, maxHeight: '90vh', display: 'flex', flexDirection: 'column', width: '700px', maxWidth: '95vw'}}>
             <button onClick={() => setShowCalendar(false)} style={{ position: 'absolute', top: '10px', right: '15px', border: 'none', background: 'none', fontSize: '24px', cursor: 'pointer', zIndex: 10 }}>&times;</button>
+            <h3 style={{ marginTop: 0, textAlign: 'center', flexShrink: 0 }}>Kalendar Bersepadu (Sync dengan PR1)</h3>
             
-            <h3 style={{ marginTop: 0, textAlign: 'center', flexShrink: 0 }}>Jadual Temujanji Mengikut Klinik</h3>
-            
-            {/* Kalendar statik */}
-            <div style={{ display: 'flex', justifyContent: 'center', margin: '15px 0', flexShrink: 0 }}>
-              <Calendar onChange={setSelectedDate} value={selectedDate} tileContent={tileContent} />
-            </div>
-            
-            {/* RUANGAN SENARAI YANG BOLEH DI-SCROLL */}
-            <div style={{ backgroundColor: '#f9f9f9', padding: '15px', borderRadius: '8px', border: '1px solid #ddd', overflowY: 'auto', flexGrow: 1 }}>
-              {/* Tajuk Tarikh Kekal di Atas bila scroll (Sticky) */}
-              <h4 style={{ margin: '0 0 10px 0', position: 'sticky', top: 0, backgroundColor: '#f9f9f9', zIndex: 2, paddingBottom: '5px', borderBottom: '2px solid #ddd' }}>
-                Temujanji: {selectedDate.toLocaleDateString('ms-MY')}
-              </h4>
+            <div style={{ display: 'flex', gap: '20px', flexGrow: 1, overflow: 'hidden' }}>
               
-              {appointmentsOnSelectedDate.length === 0 ? ( <p>Tiada temujanji.</p> ) : (
-                <ul style={{ fontSize: '14px', paddingLeft: '20px', margin: 0 }}>
-                  {appointmentsOnSelectedDate.map(kontak => {
-                    const ks = indexCases.find(i => i.id === kontak.index_case_id);
-                    return (
-                      <li key={kontak.id} style={{ marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px dashed #ccc' }}>
-                        <strong>{kontak.nama}</strong> ({kontak.no_tel})<br/>
-                        <span style={{ color: colors.blue, fontWeight: 'bold', fontSize: '12px' }}>Klinik: {ks?.klinik || '-'}</span> <span style={{ color: '#666', fontSize: '12px' }}> | Indeks: {ks?.nama || '-'}</span>
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <div style={{ margin: '0 auto', flexShrink: 0 }}>
+                  <Calendar onChange={setSelectedDate} value={selectedDate} tileContent={tileContent} tileClassName={tileClassName}/>
+                </div>
+              </div>
+
+              <div style={{ flex: 1, backgroundColor: '#f9f9f9', padding: '15px', borderRadius: '8px', border: '1px solid #ddd', overflowY: 'auto' }}>
+                <div style={{ position: 'sticky', top: 0, backgroundColor: '#f9f9f9', zIndex: 2, paddingBottom: '10px', borderBottom: '2px solid #ddd' }}>
+                  <h4 style={{ margin: 0 }}>Temujanji: {selectedDate.toLocaleDateString('ms-MY')}</h4>
+                </div>
+
+                {isHoliday ? (
+                  <div style={{ padding: '20px', textAlign: 'center', color: '#ef4444', fontWeight: 'bold' }}>CUTI UMUM: {isHoliday.keterangan}</div>
+                ) : (
+                  <>
+                    <h5 style={{ color: colors.orange, borderBottom: '1px solid #ccc', paddingBottom: '4px' }}>Kontak Auto (PPKP)</h5>
+                    {appointmentsOnSelectedDate.length === 0 ? <p style={{fontSize:'12px', color:'#888'}}>Tiada rekod kontak.</p> : (
+                      <ul style={{ fontSize: '12px', paddingLeft: '15px', margin: '0 0 15px 0' }}>
+                        {appointmentsOnSelectedDate.map(c => {
+                          const ks = indexCases.find(i => i.id === c.index_case_id);
+                          return (
+                            <li key={c.id} style={{ marginBottom: '5px' }}>
+                              <strong>{c.nama}</strong> ({c.no_tel})<br/>
+                              <span style={{ color: colors.blue, fontWeight: 'bold' }}>Klinik: {ks?.klinik || '-'}</span> | <span style={{ color: '#666' }}>No. Tibi: {ks?.no_daftar_tibi || '-'}</span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+
+                    <h5 style={{ color: colors.blue, borderBottom: '1px solid #ccc', paddingBottom: '4px' }}>Temujanji Custom (PR1)</h5>
+                    {customApptsOnSelected.length === 0 ? <p style={{fontSize:'12px', color:'#888'}}>Tiada rekod custom.</p> : (
+                      <ul style={{ fontSize: '12px', paddingLeft: '15px', margin: 0 }}>
+                        {customApptsOnSelected.map(a => (
+                          <li key={a.id} style={{ marginBottom: '5px' }}>
+                            <strong>{a.nama}</strong><br/>
+                            <span style={{ color: '#666' }}>TBK: {a.tbk} | {a.klinik}</span><br/>
+                            Tujuan: <span style={{color: colors.blue, fontWeight: 'bold'}}>{a.tujuan}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
 
           </div>

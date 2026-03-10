@@ -54,11 +54,13 @@ export default function ScreenAdmin() {
   const handleExportExcel = () => {
     const exportData = [];
     
+    // Format Masa Lengkap (Tarikh & Masa Daftar)
     const formatDateTime = (dateString) => {
       if (!dateString) return '-';
       return new Date(dateString).toLocaleString('ms-MY', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
     };
     
+    // Format Tarikh Sahaja
     const formatDateOnly = (dateString) => {
       if (!dateString) return '-';
       return new Date(dateString).toLocaleDateString('ms-MY', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -71,43 +73,41 @@ export default function ScreenAdmin() {
       
       const baseCaseData = {
         'Tarikh & Masa Daftar': formatDateTime(kes.created_at),
-        'Tarikh Notifikasi': formatDateOnly(kes.tarikh_notifikasi),
-        'Tarikh Diagnosis': formatDateOnly(kes.tarikh_diagnosis),
+        'No Daftar Tibi': kes.no_daftar_tibi || '-',
         'Klinik': kes.klinik,
-        'Status Kes': kes.is_finished ? 'Selesai' : 'Aktif',
         'Kategori Indeks': kes.kategori,
         'Nama Indeks': kes.nama,
         'No K/P Indeks': kes.ic_no,
+        'No Tel Indeks': kes.no_tel || '-',
+        'Alamat Indeks': kes.alamat || '-',
+        'Tarikh Notifikasi': formatDateOnly(kes.tarikh_notifikasi),
+        'Tarikh Diagnosis': formatDateOnly(kes.tarikh_diagnosis),
+        'Status Kes': kes.is_finished ? 'Selesai' : 'Pemantauan',
       };
 
       if (caseContacts.length === 0) {
         exportData.push({
           ...baseCaseData,
-          'Nama Kontak': 'TIADA KONTAK', 'No Tel Kontak': '-', 'Status TB Kontak': '-',
-          'Tarikh Diberi (S1)': '-', 'Tarikh Hadir (S1)': '-', 'IGRA (S1)': '-', 'Mantoux (S1)': '-', 'CXR (S1)': '-',
-          'Tarikh Diberi (S2)': '-', 'Tarikh Hadir (S2)': '-', 'IGRA (S2)': '-', 'Mantoux (S2)': '-', 'CXR (S2)': '-',
-          'Tarikh Diberi (S3)': '-', 'Tarikh Hadir (S3)': '-', 'IGRA (S3)': '-', 'Mantoux (S3)': '-', 'CXR (S3)': '-',
-          'Tarikh Diberi (S4)': '-', 'Tarikh Hadir (S4)': '-', 'IGRA (S4)': '-', 'Mantoux (S4)': '-', 'CXR (S4)': '-'
+          'Nama Kontak': 'TIADA KONTAK', 'No K/P Kontak': '-', 'No Tel Kontak': '-', 'Alamat Kontak': '-', 'Status TB Kontak': '-',
+          'Tarikh S1 (Asal)': '-', 'Tarikh S1 (Baru)': '-', 'Tarikh Hadir S1': '-', 'IGRA S1': '-', 'Mantoux S1': '-', 'CXR S1': '-',
+          'Tarikh S2 (Asal)': '-', 'Tarikh S2 (Baru)': '-', 'Tarikh Hadir S2': '-', 'IGRA S2': '-', 'Mantoux S2': '-', 'CXR S2': '-',
+          'Tarikh S3 (Asal)': '-', 'Tarikh S3 (Baru)': '-', 'Tarikh Hadir S3': '-', 'IGRA S3': '-', 'Mantoux S3': '-', 'CXR S3': '-',
+          'Tarikh S4 (Asal)': '-', 'Tarikh S4 (Baru)': '-', 'Tarikh Hadir S4': '-', 'IGRA S4': '-', 'Mantoux S4': '-', 'CXR S4': '-'
         });
       } else {
         caseContacts.forEach(kontak => {
           exportData.push({
             ...baseCaseData,
             'Nama Kontak': kontak.nama,
-            'No Tel Kontak': kontak.no_tel,
+            'No K/P Kontak': kontak.ic_no || '-',
+            'No Tel Kontak': kontak.no_tel || '-',
+            'Alamat Kontak': kontak.alamat || '-',
             'Status TB Kontak': kontak.status_tb || 'Dalam Saringan',
             
-            'Tarikh Diberi (S1)': formatDateOnly(kontak.tarikh_saringan_1), 'Tarikh Hadir (S1)': formatDateOnly(kontak.tarikh_hadir_1),
-            'IGRA (S1)': kontak.igra_1 || '-', 'Mantoux (S1)': kontak.mantoux_1 || '-', 'CXR (S1)': kontak.cxr_1 || '-',
-            
-            'Tarikh Diberi (S2)': formatDateOnly(kontak.tarikh_saringan_2), 'Tarikh Hadir (S2)': formatDateOnly(kontak.tarikh_hadir_2),
-            'IGRA (S2)': kontak.igra_2 || '-', 'Mantoux (S2)': kontak.mantoux_2 || '-', 'CXR (S2)': kontak.cxr_2 || '-',
-            
-            'Tarikh Diberi (S3)': formatDateOnly(kontak.tarikh_saringan_3), 'Tarikh Hadir (S3)': formatDateOnly(kontak.tarikh_hadir_3),
-            'IGRA (S3)': kontak.igra_3 || '-', 'Mantoux (S3)': kontak.mantoux_3 || '-', 'CXR (S3)': kontak.cxr_3 || '-',
-            
-            'Tarikh Diberi (S4)': formatDateOnly(kontak.tarikh_saringan_4), 'Tarikh Hadir (S4)': formatDateOnly(kontak.tarikh_hadir_4),
-            'IGRA (S4)': kontak.igra_4 || '-', 'Mantoux (S4)': kontak.mantoux_4 || '-', 'CXR (S4)': kontak.cxr_4 || '-'
+            'Tarikh S1 (Asal)': formatDateOnly(kontak.tarikh_saringan_1), 'Tarikh S1 (Baru)': formatDateOnly(kontak.tarikh_saringan_1_baru), 'Tarikh Hadir S1': formatDateOnly(kontak.tarikh_hadir_1), 'IGRA S1': kontak.igra_1 || '-', 'Mantoux S1': kontak.mantoux_1 || '-', 'CXR S1': kontak.cxr_1 || '-',
+            'Tarikh S2 (Asal)': formatDateOnly(kontak.tarikh_saringan_2), 'Tarikh S2 (Baru)': formatDateOnly(kontak.tarikh_saringan_2_baru), 'Tarikh Hadir S2': formatDateOnly(kontak.tarikh_hadir_2), 'IGRA S2': kontak.igra_2 || '-', 'Mantoux S2': kontak.mantoux_2 || '-', 'CXR S2': kontak.cxr_2 || '-',
+            'Tarikh S3 (Asal)': formatDateOnly(kontak.tarikh_saringan_3), 'Tarikh S3 (Baru)': formatDateOnly(kontak.tarikh_saringan_3_baru), 'Tarikh Hadir S3': formatDateOnly(kontak.tarikh_hadir_3), 'IGRA S3': kontak.igra_3 || '-', 'Mantoux S3': kontak.mantoux_3 || '-', 'CXR S3': kontak.cxr_3 || '-',
+            'Tarikh S4 (Asal)': formatDateOnly(kontak.tarikh_saringan_4), 'Tarikh S4 (Baru)': formatDateOnly(kontak.tarikh_saringan_4_baru), 'Tarikh Hadir S4': formatDateOnly(kontak.tarikh_hadir_4), 'IGRA S4': kontak.igra_4 || '-', 'Mantoux S4': kontak.mantoux_4 || '-', 'CXR S4': kontak.cxr_4 || '-'
           });
         });
       }
@@ -115,7 +115,7 @@ export default function ScreenAdmin() {
 
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Laporan_Induk_TBCM");
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Laporan_TBCM");
     XLSX.writeFile(workbook, `Laporan_Lengkap_TBCM_${filterKlinik.replace(/\s+/g, '_')}.xlsx`);
   };
 

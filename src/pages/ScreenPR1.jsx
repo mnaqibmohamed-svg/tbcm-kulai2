@@ -40,8 +40,6 @@ export default function ScreenPR1() {
     if (!user) { navigate('/'); return; }
     const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
     if (profile) setCurrentUser(profile);
-    
-    // Auto set default klinik based on profile
     if (profile && profile.clinic) setFilterKlinik(profile.clinic);
     
     fetchData();
@@ -63,7 +61,6 @@ export default function ScreenPR1() {
 
   const handleLogout = async () => { await supabase.auth.signOut(); navigate('/'); };
 
-  // --- LOGIK AUTO-STATUS (Req 5) ---
   const calculateAutoStatus = (form) => {
     const isAbnormal = [form.cxr_1, form.cxr_2, form.cxr_3, form.cxr_4].includes('Abnormal');
     if (isAbnormal) return 'Aktif TB';
@@ -73,7 +70,6 @@ export default function ScreenPR1() {
                   .some(val => posTerms.includes(val));
     if (isTBI) return 'TBI';
 
-    // Jika telah hadiri S4 dan tiada yg abnormal/positif
     if (form.tarikh_hadir_4) return 'Tiada TB';
 
     return 'Dalam Saringan';
@@ -94,7 +90,7 @@ export default function ScreenPR1() {
   const handleContactChange = (field, value) => { 
     setContactForm(prev => {
       const updated = { ...prev, [field]: value };
-      updated.status_tb = calculateAutoStatus(updated); // auto-calculate immediately
+      updated.status_tb = calculateAutoStatus(updated); 
       return updated;
     }); 
   };
@@ -103,7 +99,6 @@ export default function ScreenPR1() {
     e.preventDefault();
     setLoadingContact(true);
     
-    // Pastikan status dikemaskini sebelum simpan
     const finalStatus = calculateAutoStatus(contactForm);
     
     const { error } = await supabase.from('contacts').update({
@@ -121,8 +116,15 @@ export default function ScreenPR1() {
     setLoadingContact(false);
   };
 
-  // --- LOGIK FILTER PENDING & OUTSTANDING ---
-  const todayStr = new Date().toISOString().split('T')[0];
+  const formatSafeDate = (d) => {
+    if (!d) return '';
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  const todayStr = formatSafeDate(new Date());
 
   const isContactOutstanding = (c) => {
     for (let i = 1; i <= 4; i++) {
@@ -134,11 +136,9 @@ export default function ScreenPR1() {
   };
 
   const isContactPending = (c) => {
-    // Pending jika pesakit dah hadir tapi result ujian masih kosong atau "Pending"
     for (let i = 1; i <= 4; i++) {
       if (c[`tarikh_hadir_${i}`]) {
         if (c[`igra_${i}`] === 'Pending' || c[`mantoux_${i}`] === 'Pending' || c[`cxr_${i}`] === 'Pending') return true;
-        // Boleh tambah logik jika result kosong == pending
       }
     }
     return false;
@@ -154,17 +154,35 @@ export default function ScreenPR1() {
     return matchName && matchKlinik && matchOutstanding && matchPending;
   });
 
-  // --- LOGIK KALENDAR, CUSTOM APPT & CUTI UMUM ---
-  const formatSafeDate = (d) => {
-    if (!d) return '';
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
+  // --- LOGIK KPI ---
+  const kpiIndeks = indexCases.length;
+  const indeksSP = indexCases.filter(k => k.kategori === 'Smear Positif').length;
+  const indeksSN = indexCases.filter(k => k.kategori === 'Smear Negatif').length;
+  const indeksEPTB = indexCases.filter(k => k.kategori === 'ExtraPTB').length;
+
+  const kpiKontak = allContacts.length;
+  const kontakSP = allContacts.filter(c => indexCases.some(k => k.id === c.index_case_id && k.kategori === 'Smear Positif')).length;
+  const kontakSN = allContacts.filter(c => indexCases.some(k => k.id === c.index_case_id && k.kategori === 'Smear Negatif')).length;
+  const kontakEPTB = allContacts.filter(c => indexCases.some(k => k.id === c.index_case_id && k.kategori === 'ExtraPTB')).length;
+
+  const calcPercent = (n) => {
+    if (kpiKontak === 0) return '0%';
+    const attended = allContacts.filter(c => c[`tarikh_hadir_${n}`]).length;
+    return `${((attended / kpiKontak) * 100).toFixed(1)}%`;
   };
 
+  // --- LOGIK PENGUMUMAN TEMUJANJI HARI INI ---
+  const todayAppointments = allContacts.filter(c => 
+    (c.tarikh_saringan_1_baru || c.tarikh_saringan_1) === todayStr || 
+    (c.tarikh_saringan_2_baru || c.tarikh_saringan_2) === todayStr || 
+    (c.tarikh_saringan_3_baru || c.tarikh_saringan_3) === todayStr || 
+    (c.tarikh_saringan_4_baru || c.tarikh_saringan_4) === todayStr
+  );
+  const todayCustomAppts = customAppts.filter(a => a.tarikh === todayStr && (filterKlinik === 'Semua' || a.klinik === filterKlinik));
+  const totalToday = todayAppointments.length + todayCustomAppts.length;
+
+  // --- LOGIK KALENDAR ---
   const selectedDateStr = formatSafeDate(selectedDate);
-  
   const isHoliday = holidays.find(h => h.tarikh === selectedDateStr);
 
   const appointmentsOnSelectedDate = allContacts.filter(c => 
@@ -258,10 +276,21 @@ export default function ScreenPR1() {
     }
   };
 
+  const getSummaryStyle = (attended, total) => {
+    if (total === 0) return { color: '#64748b', fontWeight: 'normal' };
+    if (attended === 0) return { color: '#ef4444', fontWeight: 'bold' };
+    if (attended < total) return { color: '#d97706', fontWeight: 'bold' };
+    return { color: '#10b981', fontWeight: 'bold' };
+  };
+
   const colors = { dark: '#1e293b', blue: '#007bff', cyan: '#17a2b8', green: '#28a745', yellow: '#ffc107', red: '#dc3545', grey: '#6c757d', purple: '#8b5cf6', orange: '#f97316' };
   const s = {
     page: { padding: '20px', fontFamily: 'Arial, sans-serif', backgroundColor: '#f4f6f9', minHeight: '100vh' },
     topHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '3px solid #ddd', paddingBottom: '15px', marginBottom: '20px' },
+    h1: { margin: 0, color: colors.dark, fontSize: '24px' },
+    p: { margin: '5px 0 0 0', color: colors.grey },
+    kpiLayout: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', marginBottom: '15px' },
+    kpiCard: (color) => ({ backgroundColor: '#fff', padding: '15px 20px', borderRadius: '8px', borderLeft: `5px solid ${color}`, boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }),
     table: { width: '100%', borderCollapse: 'collapse', fontSize: '14px', backgroundColor: '#fff', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' },
     th: { padding: '12px', backgroundColor: '#343a40', color: '#fff', textAlign: 'left', borderBottom: '2px solid #ddd' },
     td: { padding: '12px', borderBottom: '1px solid #ddd', verticalAlign: 'middle' },
@@ -269,7 +298,8 @@ export default function ScreenPR1() {
     modalContent: { backgroundColor: 'white', padding: '30px', borderRadius: '8px', position: 'relative', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' },
     input: { padding: '8px', border: '1px solid #ccc', borderRadius: '4px', width: '100%', boxSizing: 'border-box' },
     formGroup: { display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '12px' },
-    select: { padding: '6px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '13px' }
+    select: { padding: '6px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '13px' },
+    announcement: { backgroundColor: totalToday > 0 ? '#fef3c7' : '#e0f2fe', border: `1px solid ${totalToday > 0 ? '#f59e0b' : '#38bdf8'}`, padding: '15px', borderRadius: '8px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }
   };
 
   return (
@@ -281,12 +311,52 @@ export default function ScreenPR1() {
 
       <div style={s.topHeader}>
         <div>
-          <h1 style={{ margin: 0, color: colors.dark, fontSize: '24px' }}>TBCM Kulai (Modul Klinikal)</h1>
-          <p style={{ margin: '5px 0 0 0', color: colors.grey }}>Pengurusan Pesakit - PR1 / Pegawai Perubatan</p>
+          <h1 style={s.h1}>TBCM Kulai (Modul Klinikal)</h1>
+          <p style={s.p}>Pengurusan Pesakit - PR1 / Pegawai Perubatan</p>
         </div>
         <button onClick={handleLogout} style={{ padding: '10px 20px', backgroundColor: colors.red, color: 'white', border: 'none', cursor: 'pointer', borderRadius: '4px', fontWeight: 'bold' }}>Log Keluar</button>
       </div>
 
+      {/* PENGUMUMAN TEMUJANJI HARI INI */}
+      <div style={s.announcement}>
+        <div>
+          <h3 style={{ margin: '0 0 5px 0', color: totalToday > 0 ? '#b45309' : '#0369a1' }}>📅 Makluman Temujanji Hari Ini</h3>
+          <p style={{ margin: 0, fontSize: '14px', color: '#444' }}>
+            Anda mempunyai <strong>{totalToday} temujanji</strong> pada hari ini ({new Date().toLocaleDateString('ms-MY')}).
+            {totalToday > 0 && ` Sila klik butang Kalendar PR1 untuk melihat senarai.`}
+          </p>
+        </div>
+        {totalToday > 0 && <button onClick={() => { setSelectedDate(new Date()); setShowCalendar(true); }} style={{ padding: '8px 15px', backgroundColor: '#f59e0b', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Lihat Senarai Temujanji</button>}
+      </div>
+
+      {/* KAD KPI (INDEKS, KONTAK, SARINGAN) */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+        <div style={s.kpiCard(colors.blue)}>
+          <h3 style={{ margin: '0 0 8px 0', color: colors.dark }}>Jumlah Kes Indeks: {kpiIndeks}</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: colors.grey, borderTop: '1px solid #eee', paddingTop: '8px' }}>
+            <span>Smear Positif: <strong>{indeksSP}</strong></span>
+            <span>Smear Negatif: <strong>{indeksSN}</strong></span>
+            <span>Extra PTB: <strong>{indeksEPTB}</strong></span>
+          </div>
+        </div>
+        <div style={s.kpiCard(colors.cyan)}>
+          <h3 style={{ margin: '0 0 8px 0', color: colors.dark }}>Jumlah Kontak: {kpiKontak}</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: colors.grey, borderTop: '1px solid #eee', paddingTop: '8px' }}>
+            <span>Drpd SP: <strong>{kontakSP}</strong></span>
+            <span>Drpd SN: <strong>{kontakSN}</strong></span>
+            <span>Drpd EPTB: <strong>{kontakEPTB}</strong></span>
+          </div>
+        </div>
+      </div>
+
+      <div style={{...s.kpiLayout, gridTemplateColumns: 'repeat(4, 1fr)'}}>
+        <div style={s.kpiCard(colors.green)}><h2 style={{margin:0, color: colors.dark}}>{calcPercent(1)}</h2><p style={{margin:0, fontSize:'12px', color:colors.grey, fontWeight:'bold'}}>Hadir Saringan 1</p></div>
+        <div style={s.kpiCard(colors.green)}><h2 style={{margin:0, color: colors.dark}}>{calcPercent(2)}</h2><p style={{margin:0, fontSize:'12px', color:colors.grey, fontWeight:'bold'}}>Hadir Saringan 2</p></div>
+        <div style={s.kpiCard(colors.green)}><h2 style={{margin:0, color: colors.dark}}>{calcPercent(3)}</h2><p style={{margin:0, fontSize:'12px', color:colors.grey, fontWeight:'bold'}}>Hadir Saringan 3</p></div>
+        <div style={s.kpiCard(colors.green)}><h2 style={{margin:0, color: colors.dark}}>{calcPercent(4)}</h2><p style={{margin:0, fontSize:'12px', color:colors.grey, fontWeight:'bold'}}>Hadir Saringan 4</p></div>
+      </div>
+
+      {/* JADUAL UTAMA */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap', gap: '10px' }}>
         <h3 style={{ margin: 0 }}>Senarai Kes & Kemaskini Klinikal</h3>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -309,7 +379,7 @@ export default function ScreenPR1() {
       <table style={s.table}>
         <thead>
           <tr>
-            <th style={s.th}>Kes Indeks</th>
+            <th style={s.th}>Kes Indeks & Outstanding</th>
             <th style={s.th}>Statistik Saringan Kontak</th>
             <th style={{...s.th, textAlign: 'right'}}>Tindakan</th>
           </tr>
@@ -317,16 +387,28 @@ export default function ScreenPR1() {
         <tbody>
           {filteredCases.map(kes => {
             const caseContacts = allContacts.filter(c => c.index_case_id === kes.id);
+            const hasOutstanding = caseContacts.some(c => isContactOutstanding(c));
             const isExpanded = expandedCaseId === kes.id;
 
             return (
               <React.Fragment key={kes.id}>
-                <tr>
+                <tr style={{ backgroundColor: kes.is_finished ? '#e9ecef' : 'transparent' }}>
                   <td style={s.td}>
+                    {hasOutstanding && <span style={{ width: '10px', height: '10px', backgroundColor: colors.red, borderRadius: '50%', display: 'inline-block', marginRight: '8px', animation: 'pulse 1.5s infinite' }} title="Saringan Tertunggak"></span>}
                     <strong>{kes.nama}</strong> <br/>
                     <span style={{fontSize:'12px', color:'#666'}}>No Tibi: <strong>{kes.no_daftar_tibi || '-'}</strong> | {kes.klinik}</span>
                   </td>
-                  <td style={s.td}>Jumlah Kontak Didaftar: {caseContacts.length} orang</td>
+                  
+                  {/* SUMMARY S1-S4 KEMBALI DI SINI */}
+                  <td style={s.td}>
+                    <div style={{ display: 'flex', gap: '15px' }}>
+                      {[1, 2, 3, 4].map(n => {
+                        const attended = caseContacts.filter(c => c[`tarikh_hadir_${n}`]).length;
+                        return <span key={n} style={{ ...getSummaryStyle(attended, caseContacts.length), fontSize: '12px' }}>S{n}: {attended}/{caseContacts.length}</span>
+                      })}
+                    </div>
+                  </td>
+                  
                   <td style={{...s.td, textAlign: 'right'}}>
                     <button onClick={() => setExpandedCaseId(isExpanded ? null : kes.id)} style={{ padding: '6px 12px', backgroundColor: colors.blue, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
                       {isExpanded ? 'Tutup Senarai' : 'Klinikal Kontak'}
@@ -406,7 +488,7 @@ export default function ScreenPR1() {
         </tbody>
       </table>
 
-      {/* KALENDAR PR1 MODAL */}
+      {/* KALENDAR PR1 MODAL (DENGAN NO DAFTAR TIBI) */}
       {showCalendar && (
         <div style={s.modalOverlay}>
           <div style={{...s.modalContent, width: '700px', maxWidth: '95vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column'}}>
@@ -441,7 +523,16 @@ export default function ScreenPR1() {
                     <h5 style={{ color: colors.orange, borderBottom: '1px solid #ccc', paddingBottom: '4px' }}>Kontak Auto (PPKP)</h5>
                     {appointmentsOnSelectedDate.length === 0 ? <p style={{fontSize:'12px', color:'#888'}}>Tiada rekod kontak.</p> : (
                       <ul style={{ fontSize: '12px', paddingLeft: '15px', margin: '0 0 15px 0' }}>
-                        {appointmentsOnSelectedDate.map(c => <li key={c.id}><strong>{c.nama}</strong> ({c.status_tb || 'Dalam Saringan'})</li>)}
+                        {appointmentsOnSelectedDate.map(c => {
+                          const ks = indexCases.find(i => i.id === c.index_case_id);
+                          return (
+                            <li key={c.id} style={{ marginBottom: '5px' }}>
+                              <strong>{c.nama}</strong> ({c.status_tb || 'Dalam Saringan'})<br/>
+                              {/* NO DAFTAR TIBI DITAMBAH DI SINI */}
+                              <span style={{ color: '#666', fontSize: '11px' }}>No. Tibi: <strong>{ks?.no_daftar_tibi || '-'}</strong> | Indeks: {ks?.nama || '-'}</span>
+                            </li>
+                          );
+                        })}
                       </ul>
                     )}
 
