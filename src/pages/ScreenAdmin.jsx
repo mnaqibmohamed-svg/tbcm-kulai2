@@ -129,6 +129,8 @@ export default function ScreenAdmin() {
   const indeksSP = filteredCases.filter(k => k.kategori === 'Smear Positif').length;
   const indeksSN = filteredCases.filter(k => k.kategori === 'Smear Negatif').length;
   const indeksEPTB = filteredCases.filter(k => k.kategori === 'ExtraPTB').length;
+  const kpiSelesai = filteredCases.filter(k => k.is_finished).length;
+  const kpiPemantauan = filteredCases.filter(k => !k.is_finished).length;
 
   const kpiKontak = filteredContacts.length;
   const getKontakByIndeksCategory = (cat) => filteredContacts.filter(c => filteredCases.find(k => k.id === c.index_case_id)?.kategori === cat).length;
@@ -232,6 +234,16 @@ export default function ScreenAdmin() {
                 <div style={s.kpiSubText}><span>Smear Positif:</span> <strong>{indeksSP}</strong></div>
                 <div style={s.kpiSubText}><span>Smear Negatif:</span> <strong>{indeksSN}</strong></div>
                 <div style={s.kpiSubText}><span>Extra PTB:</span> <strong>{indeksEPTB}</strong></div>
+              </div>
+            </div>
+
+            <div style={s.kpiCard('#8b5cf6')}>
+              <h4 style={s.kpiTitle}>Status Penutupan Kes</h4>
+              <h2 style={{...s.kpiValue, color: '#8b5cf6'}}>{kpiSelesai}<span style={{fontSize:'16px', color:'#888'}}> / {kpiIndeks}</span></h2>
+              <div style={{ marginTop: 'auto' }}>
+                <div style={s.kpiSubText}><span>✅ Selesai:</span> <strong style={{color:'#16a34a'}}>{kpiSelesai} kes</strong></div>
+                <div style={s.kpiSubText}><span>🔵 Pemantauan:</span> <strong style={{color:'#ca8a04'}}>{kpiPemantauan} kes</strong></div>
+                <div style={s.kpiSubText}><span>Kadar Selesai:</span> <strong>{kpiIndeks > 0 ? ((kpiSelesai/kpiIndeks)*100).toFixed(1) : 0}%</strong></div>
               </div>
             </div>
 

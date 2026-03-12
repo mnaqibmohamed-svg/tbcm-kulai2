@@ -61,6 +61,26 @@ export default function ScreenPR1() {
 
   const handleLogout = async () => { await supabase.auth.signOut(); navigate('/'); };
 
+  const handleToggleFinished = async (kes, caseContacts) => {
+    const newStatus = !kes.is_finished;
+    const action = newStatus ? 'Selesai' : 'Pemantauan';
+    
+    // Guard: prevent marking as Selesai if not all contacts attended S4
+    if (newStatus && caseContacts.length > 0) {
+      const allDone = caseContacts.every(c => c.tarikh_hadir_4);
+      if (!allDone) {
+        alert('Amaran: Masih terdapat kontak yang belum hadir Saringan 4. Sila pastikan semua kontak telah selesai sebelum menutup kes.');
+        return;
+      }
+    }
+    
+    if (window.confirm(`Tandakan kes "${kes.nama}" sebagai "${action}"?`)) {
+      const { error } = await supabase.from('index_cases').update({ is_finished: newStatus }).eq('id', kes.id);
+      if (error) alert('Ralat: ' + error.message);
+      else fetchData();
+    }
+  };
+
   const calculateAutoStatus = (form) => {
     const isAbnormal = [form.cxr_1, form.cxr_2, form.cxr_3, form.cxr_4].includes('Abnormal');
     if (isAbnormal) return 'Aktif TB';
@@ -401,8 +421,14 @@ export default function ScreenPR1() {
                   </td>
                   
                   <td style={{...s.td, textAlign: 'right'}}>
-                    <button onClick={() => setExpandedCaseId(isExpanded ? null : kes.id)} style={{ padding: '6px 12px', backgroundColor: colors.blue, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize:'12px' }}>
+                    <button onClick={() => setExpandedCaseId(isExpanded ? null : kes.id)} style={{ padding: '6px 12px', backgroundColor: colors.blue, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize:'12px', marginRight: '5px' }}>
                       {isExpanded ? 'Tutup Senarai' : 'Klinikal Kontak'}
+                    </button>
+                    <button
+                      onClick={() => handleToggleFinished(kes, caseContacts)}
+                      title={kes.is_finished ? 'Buka semula kes ini' : 'Tandakan kes ini sebagai Selesai'}
+                      style={{ padding: '6px 10px', backgroundColor: kes.is_finished ? colors.grey : colors.green, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize:'12px' }}>
+                      {kes.is_finished ? '↩ Buka Semula' : '✓ Selesai'}
                     </button>
                   </td>
                 </tr>
